@@ -1,0 +1,20 @@
+# GCP Project
+gcp_project = "your-project-id"
+gcp_region  = "us-central1"
+
+# Project settings
+project_name = "microservices-sre"
+environment  = "dev"
+
+# Instance configuration
+machine_type  = "e2-micro"
+disk_size_gb  = 30
+
+# SSH access
+ssh_cidr_block = "0.0.0.0/0"
+
+# SSH public key
+public_key_material = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ..."
+
+# Git repo
+app_repo_url = "https://github.com/your-username/microservices-sre"

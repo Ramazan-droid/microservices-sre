@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MicroShop - Microservices Demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; }
+  .header { background: linear-gradient(135deg, #1e293b, #334155); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; }
+  .logo { font-size: 1.5rem; font-weight: 700; color: #38bdf8; }
+  .nav { display: flex; gap: 1rem; }
+  .nav button { background: transparent; border: 1px solid #475569; color: #94a3b8; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+  .nav button:hover, .nav button.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
+  .user-info { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: #94a3b8; }
+  .badge { background: #22c55e; color: white; padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; }
+  .badge.red { background: #ef4444; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+  .card h3 { color: #38bdf8; margin-bottom: 1rem; }
+  .form-group { margin-bottom: 1rem; }
+  label { display: block; margin-bottom: 0.3rem; color: #94a3b8; font-size: 0.9rem; }
+  input, textarea, select { width: 100%; padding: 0.6rem; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 0.9rem; }
+  input:focus, textarea:focus { outline: none; border-color: #38bdf8; }
+  .btn { padding: 0.6rem 1.5rem; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+  .btn-primary { background: #38bdf8; color: #0f172a; font-weight: 600; }
+  .btn-primary:hover { background: #0ea5e9; }
+  .btn-danger { background: #ef4444; color: white; }
+  .btn-success { background: #22c55e; color: white; }
+  .btn-secondary { background: #475569; color: white; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+  .product-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.5rem; transition: border-color 0.2s; }
+  .product-card:hover { border-color: #38bdf8; }
+  .product-name { font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .product-price { color: #22c55e; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .product-stock { color: #94a3b8; font-size: 0.85rem; margin-bottom: 1rem; }
+  .alert { padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem; }
+  .alert-success { background: #064e3b; border: 1px solid #22c55e; color: #4ade80; }
+  .alert-error { background: #450a0a; border: 1px solid #ef4444; color: #f87171; }
+  .alert-info { background: #0c4a6e; border: 1px solid #38bdf8; color: #7dd3fc; }
+  .table { width: 100%; border-collapse: collapse; }
+  .table th { text-align: left; padding: 0.75rem; color: #94a3b8; border-bottom: 1px solid #334155; font-size: 0.85rem; }
+  .table td { padding: 0.75rem; border-bottom: 1px solid #1e293b; font-size: 0.9rem; }
+  .table tr:hover td { background: #334155; }
+  .status-badge { padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+  .status-pending { background: #78350f; color: #fbbf24; }
+  .status-completed { background: #064e3b; color: #4ade80; }
+  .status-cancelled { background: #450a0a; color: #f87171; }
+  .service-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+  .service-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1rem; text-align: center; }
+  .service-status { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .status-ok { background: #22c55e; }
+  .status-down { background: #ef4444; }
+  .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+  .tab { padding: 0.5rem 1rem; background: #1e293b; border: 1px solid #334155; border-radius: 6px; cursor: pointer; color: #94a3b8; }
+  .tab.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; font-weight: 600; }
+  .chat-container { display: flex; gap: 1rem; height: 400px; }
+  .chat-sidebar { width: 200px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1rem; overflow-y: auto; }
+  .chat-main { flex: 1; display: flex; flex-direction: column; background: #1e293b; border: 1px solid #334155; border-radius: 8px; }
+  .chat-messages { flex: 1; padding: 1rem; overflow-y: auto; }
+  .chat-input { display: flex; gap: 0.5rem; padding: 1rem; border-top: 1px solid #334155; }
+  .chat-input input { flex: 1; }
+  .message { margin-bottom: 0.75rem; }
+  .message.sent { text-align: right; }
+  .message-bubble { display: inline-block; padding: 0.5rem 0.75rem; border-radius: 8px; max-width: 80%; font-size: 0.9rem; }
+  .sent .message-bubble { background: #38bdf8; color: #0f172a; }
+  .received .message-bubble { background: #334155; color: #e2e8f0; }
+  .spinner { width: 20px; height: 20px; border: 2px solid #334155; border-top: 2px solid #38bdf8; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } .header { flex-direction: column; gap: 1rem; } }
+  .metric-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #334155; font-size: 0.9rem; }
+  .metric-value { color: #38bdf8; font-weight: 600; }
+  .incident-banner { background: #450a0a; border: 1px solid #ef4444; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 1rem; }
+  .incident-icon { font-size: 1.5rem; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">🚀 MicroShop</div>
+  <div class="nav">
+    <button class="active" onclick="showSection('dashboard')">Dashboard</button>
+    <button onclick="showSection('products')">Products</button>
+    <button onclick="showSection('orders')">Orders</button>
+    <button onclick="showSection('chat')">Chat</button>
+    <button onclick="showSection('auth')">Auth</button>
+    <button onclick="showSection('incident')">⚠️ Incident</button>
+  </div>
+  <div class="user-info">
+    <span id="auth-status">Not logged in</span>
+    <span id="auth-badge" class="badge red">●</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- DASHBOARD -->
+  <div id="section-dashboard" class="section active">
+    <h2 style="margin-bottom:1.5rem; color:#38bdf8;">System Dashboard</h2>
+    <div class="service-grid" id="services-grid">
+      <div class="service-card"><div class="spinner"></div> Loading services...</div>
+    </div>
+    <div style="margin-top:1.5rem;">
+      <div class="card">
+        <h3>📊 Quick Stats</h3>
+        <div id="quick-stats"><div class="spinner"></div></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:1rem;">
+      <h3>🔗 Service Endpoints</h3>
+      <table class="table">
+        <thead><tr><th>Service</th><th>Port</th><th>Docs</th></tr></thead>
+        <tbody>
+          <tr><td>Auth Service</td><td>8001</td><td><a href="/auth/docs" style="color:#38bdf8;">Swagger</a></td></tr>
+          <tr><td>Product Service</td><td>8002</td><td><a href="/products-svc/docs" style="color:#38bdf8;">Swagger</a></td></tr>
+          <tr><td>Order Service</td><td>8003</td><td><a href="/orders-svc/docs" style="color:#38bdf8;">Swagger</a></td></tr>
+          <tr><td>User Service</td><td>8004</td><td><a href="/users-svc/docs" style="color:#38bdf8;">Swagger</a></td></tr>
+          <tr><td>Chat Service</td><td>8005</td><td><a href="/chat-svc/docs" style="color:#38bdf8;">Swagger</a></td></tr>
+          <tr><td>Prometheus</td><td>9090</td><td><a href="http://localhost:9090" target="_blank" style="color:#38bdf8;">Open</a></td></tr>
+          <tr><td>Grafana</td><td>3000</td><td><a href="http://localhost:3000" target="_blank" style="color:#38bdf8;">Open</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- AUTH -->
+  <div id="section-auth" class="section">
+    <h2 style="margin-bottom:1.5rem; color:#38bdf8;">Authentication</h2>
+    <div id="alert-auth"></div>
+    <div class="two-col">
+      <div class="card">
+        <h3>🔐 Login</h3>
+        <div class="form-group">
+          <label>Username</label>
+          <input id="login-user" type="text" placeholder="admin" value="admin">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input id="login-pass" type="password" placeholder="password" value="password123">
+        </div>
+        <button class="btn btn-primary" onclick="doLogin()">Login</button>
+      </div>
+      <div class="card">
+        <h3>📝 Register</h3>
+        <div class="form-group">
+          <label>Username</label>
+          <input id="reg-user" type="text" placeholder="newuser">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input id="reg-email" type="email" placeholder="user@example.com">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input id="reg-pass" type="password" placeholder="password">
+        </div>
+        <button class="btn btn-primary" onclick="doRegister()">Register</button>
+      </div>
+    </div>
+    <div class="card" id="token-info" style="display:none;">
+      <h3>✅ Token Info</h3>
+      <div id="token-display"></div>
+    </div>
+  </div>
+
+  <!-- PRODUCTS -->
+  <div id="section-products" class="section">
+    <h2 style="margin-bottom:1.5rem; color:#38bdf8;">Products</h2>
+    <div id="alert-products"></div>
+    <div style="margin-bottom:1rem; display:flex; gap:0.5rem; align-items:center;">
+      <button class="btn btn-primary" onclick="loadProducts()">🔄 Refresh</button>
+      <button class="btn btn-success" onclick="document.getElementById('add-product-form').style.display='block'">+ Add Product</button>
+    </div>
+    <div id="add-product-form" class="card" style="display:none; margin-bottom:1rem;">
+      <h3>Add New Product</h3>
+      <div class="two-col">
+        <div class="form-group"><label>Name</label><input id="prod-name" placeholder="Product name"></div>
+        <div class="form-group"><label>Price</label><input id="prod-price" type="number" step="0.01" placeholder="9.99"></div>
+        <div class="form-group"><label>Stock</label><input id="prod-stock" type="number" placeholder="100"></div>
+        <div class="form-group"><label>Description</label><input id="prod-desc" placeholder="Description"></div>
+      </div>
+      <button class="btn btn-primary" onclick="addProduct()">Create Product</button>
+      <button class="btn btn-secondary" style="margin-left:0.5rem;" onclick="document.getElementById('add-product-form').style.display='none'">Cancel</button>
+    </div>
+    <div id="products-grid" class="grid"><div class="spinner"></div></div>
+  </div>
+
+  <!-- ORDERS -->
+  <div id="section-orders" class="section">
+    <h2 style="margin-bottom:1.5rem; color:#38bdf8;">Orders</h2>
+    <div id="alert-orders"></div>
+    <div class="two-col">
+      <div class="card">
+        <h3>📦 Create Order</h3>
+        <div class="form-group"><label>User ID</label><input id="order-uid" type="number" value="1"></div>
+        <div class="form-group"><label>Product ID</label><input id="order-pid" type="number" value="1"></div>
+        <div class="form-group"><label>Quantity</label><input id="order-qty" type="number" value="1" min="1"></div>
+        <button class="btn btn-primary" onclick="createOrder()">Place Order</button>
+      </div>
+      <div class="card">
+        <h3>🔍 Filter Orders</h3>
+        <div class="form-group"><label>User ID (optional)</label><input id="filter-uid" type="number" placeholder="All users"></div>
+        <button class="btn btn-primary" onclick="loadOrders()">Load Orders</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:1rem;">
+      <h3>All Orders</h3>
+      <div id="orders-table"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- CHAT -->
+  <div id="section-chat" class="section">
+    <h2 style="margin-bottom:1.5rem; color:#38bdf8;">User Chat</h2>
+    <div id="alert-chat"></div>
+    <div class="card">
+      <h3>💬 Send Message</h3>
+      <div class="two-col">
+        <div class="form-group"><label>From User ID</label><input id="chat-from" type="number" value="1"></div>
+        <div class="form-group"><label>To User ID</label><input id="chat-to" type="number" value="2"></div>
+      </div>
+      <div class="form-group"><label>Message</label><input id="chat-msg" placeholder="Type your message..."></div>
+      <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+      <button class="btn btn-secondary" style="margin-left:0.5rem;" onclick="loadMessages()">Load History</button>
+    </div>
+    <div class="card">
+      <h3>Message History</h3>
+      <div id="messages-list"></div>
+    </div>
+  </div>
+
+  <!-- INCIDENT -->
+  <div id="section-incident" class="section">
+    <h2 style="margin-bottom:1.5rem; color:#ef4444;">⚠️ Incident Response Simulation</h2>
+
+    <div class="incident-banner">
+      <div class="incident-icon">🚨</div>
+      <div>
+        <strong>Incident Simulation Panel</strong><br>
+        <small>Simulate a database misconfiguration incident in the Order Service and walk through the full incident response process.</small>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="showIncidentTab('simulate')">1. Simulate</div>
+      <div class="tab" onclick="showIncidentTab('detect')">2. Detect</div>
+      <div class="tab" onclick="showIncidentTab('analyze')">3. Analyze</div>
+      <div class="tab" onclick="showIncidentTab('mitigate')">4. Mitigate</div>
+      <div class="tab" onclick="showIncidentTab('postmortem')">5. Postmortem</div>
+    </div>
+
+    <div id="incident-simulate">
+      <div class="card">
+        <h3>🔧 Trigger Incident</h3>
+        <p style="margin-bottom:1rem; color:#94a3b8;">This simulates a database misconfiguration in the Order Service by calling it with an invalid connection. In a real scenario, you would run the following docker command:</p>
+        <div style="background:#0f172a; padding:1rem; border-radius:6px; font-family:monospace; font-size:0.85rem; color:#4ade80; margin-bottom:1rem;">
+          # Simulate: Change the DB hostname to an invalid value<br>
+          docker compose stop order-service<br>
+          docker compose run -e DATABASE_URL=postgresql://admin:password@<span style="color:#f87171;">wrong-host:5432</span>/microservices order-service
+        </div>
+        <button class="btn btn-danger" onclick="triggerIncident()">🔴 Test Order Service Failure</button>
+        <div id="incident-trigger-result" style="margin-top:1rem;"></div>
+      </div>
+    </div>
+
+    <div id="incident-detect" style="display:none;">
+      <div class="card">
+        <h3>🔍 Detection - Monitoring Alerts</h3>
+        <p style="margin-bottom:1rem; color:#94a3b8;">During the incident, Prometheus would alert on these metrics:</p>
+        <table class="table">
+          <thead><tr><th>Metric</th><th>Normal</th><th>During Incident</th><th>Alert Threshold</th></tr></thead>
+          <tbody>
+            <tr><td>order_db_connection_errors_total</td><td>0</td><td class="status-down">↑ Increasing</td><td>> 5 in 1 min</td></tr>
+            <tr><td>order_requests_total{status="500"}</td><td>0</td><td class="status-down">↑ 100%</td><td>> 1% error rate</td></tr>
+            <tr><td>order_request_duration_seconds</td><td>~50ms</td><td class="status-down">↑ timeout</td><td>> 5s p99</td></tr>
+            <tr><td>order_failures_total</td><td>0</td><td class="status-down">↑ Increasing</td><td>> 0</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:1rem;">
+          <h4 style="margin-bottom:0.5rem;">Detection Timeline:</h4>
+          <div class="metric-row"><span>T+0:00</span><span class="metric-value">First 500 error on POST /orders</span></div>
+          <div class="metric-row"><span>T+0:30</span><span class="metric-value">Prometheus alert fires: high_error_rate</span></div>
+          <div class="metric-row"><span>T+1:00</span><span class="metric-value">Grafana dashboard shows red on Order Service</span></div>
+          <div class="metric-row"><span>T+2:00</span><span class="metric-value">On-call engineer paged</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="incident-analyze" style="display:none;">
+      <div class="card">
+        <h3>🧪 Root Cause Analysis</h3>
+        <div class="alert alert-error">
+          <strong>Root Cause:</strong> DATABASE_URL environment variable misconfigured — hostname set to "wrong-host" instead of "postgres"
+        </div>
+        <h4 style="margin:1rem 0 0.5rem;">Log Analysis Commands:</h4>
+        <div style="background:#0f172a; padding:1rem; border-radius:6px; font-family:monospace; font-size:0.85rem; color:#4ade80; margin-bottom:1rem;">
+          # Check container logs<br>
+          docker logs order-service --tail 50<br><br>
+          # Expected error output:<br>
+          <span style="color:#f87171;">ERROR: could not connect to server: Name or service not known<br>
+          Is the server running on host "wrong-host" and accepting TCP/IP connections on port 5432?</span><br><br>
+          # Check container status<br>
+          docker compose ps<br><br>
+          # Inspect environment variables<br>
+          docker inspect order-service | grep DATABASE_URL
+        </div>
+        <h4 style="margin:1rem 0 0.5rem;">Contributing Factors:</h4>
+        <ul style="color:#94a3b8; padding-left:1.5rem; line-height:2;">
+          <li>No pre-deployment config validation</li>
+          <li>Missing DB connectivity health checks at startup</li>
+          <li>No automated rollback on startup failure</li>
+          <li>Alert threshold too slow (2 min detection time)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="incident-mitigate" style="display:none;">
+      <div class="card">
+        <h3>🛠️ Mitigation & Resolution</h3>
+        <div class="alert alert-info">
+          <strong>Resolution Steps:</strong> Fix the DATABASE_URL and restart the Order Service
+        </div>
+        <div style="background:#0f172a; padding:1rem; border-radius:6px; font-family:monospace; font-size:0.85rem; color:#4ade80; margin-bottom:1rem;">
+          # Step 1: Stop the broken container<br>
+          docker compose stop order-service<br><br>
+          # Step 2: Fix environment variable in docker-compose.yml<br>
+          # Change DATABASE_URL back to: postgresql://admin:password@postgres:5432/microservices<br><br>
+          # Step 3: Restart service with correct config<br>
+          docker compose up -d order-service<br><br>
+          # Step 4: Verify service is healthy<br>
+          curl http://localhost/orders-svc/health<br><br>
+          # Step 5: Confirm orders are working<br>
+          curl -X POST http://localhost/orders-svc/orders \<br>
+          &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+          &nbsp;&nbsp;-d '{"user_id": 1, "product_id": 1, "quantity": 2}'
+        </div>
+        <button class="btn btn-success" onclick="verifyRecovery()">✅ Verify Recovery</button>
+        <div id="recovery-result" style="margin-top:1rem;"></div>
+      </div>
+    </div>
+
+    <div id="incident-postmortem" style="display:none;">
+      <div class="card">
+        <h3>📋 Postmortem Report</h3>
+        <div class="metric-row"><span><strong>Incident ID</strong></span><span class="metric-value">INC-2024-001</span></div>
+        <div class="metric-row"><span><strong>Severity</strong></span><span class="metric-value" style="color:#f59e0b;">SEV-2 (High)</span></div>
+        <div class="metric-row"><span><strong>Duration</strong></span><span class="metric-value">~12 minutes</span></div>
+        <div class="metric-row"><span><strong>Services Affected</strong></span><span class="metric-value">Order Service (100% failure)</span></div>
+        <div class="metric-row"><span><strong>Customer Impact</strong></span><span class="metric-value">Order creation unavailable</span></div>
+        <div class="metric-row"><span><strong>Detection Time</strong></span><span class="metric-value">~2 minutes</span></div>
+        <div class="metric-row"><span><strong>MTTR</strong></span><span class="metric-value">12 minutes</span></div>
+        <br>
+        <h4 style="margin-bottom:0.5rem;">Action Items:</h4>
+        <table class="table">
+          <thead><tr><th>Action</th><th>Owner</th><th>Priority</th><th>Due</th></tr></thead>
+          <tbody>
+            <tr><td>Add DB URL validation on startup</td><td>Backend Team</td><td><span class="status-badge status-pending">P0</span></td><td>1 week</td></tr>
+            <tr><td>Add readiness probe for DB connectivity</td><td>DevOps</td><td><span class="status-badge status-pending">P0</span></td><td>1 week</td></tr>
+            <tr><td>Reduce Prometheus alert time to 30s</td><td>SRE</td><td><span class="status-badge status-pending">P1</span></td><td>2 weeks</td></tr>
+            <tr><td>Implement config validation in CI/CD</td><td>DevOps</td><td><span class="status-badge status-pending">P1</span></td><td>2 weeks</td></tr>
+            <tr><td>Create incident runbook</td><td>SRE</td><td><span class="status-badge status-completed">P2</span></td><td>1 month</td></tr>
+          </tbody>
+        </table>
+        <div class="alert alert-success" style="margin-top:1rem;">
+          <strong>Lessons Learned:</strong> Configuration changes must be validated before deployment. A simple connection test at startup would have prevented this incident from affecting production traffic.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = '';
+let authToken = null;
+
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'products') loadProducts();
+  if (name === 'orders') loadOrders();
+  if (name === 'dashboard') loadDashboard();
+}
+
+function showIncidentTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  ['simulate','detect','analyze','mitigate','postmortem'].forEach(t => {
+    const el = document.getElementById('incident-' + t);
+    if (el) el.style.display = t === tab ? 'block' : 'none';
+  });
+}
+
+function showAlert(id, msg, type='info') {
+  const el = document.getElementById('alert-' + id);
+  if (el) { el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`; setTimeout(() => el.innerHTML='', 5000); }
+}
+
+async function fetchAPI(url, options={}) {
+  if (authToken) {
+    options.headers = { ...(options.headers||{}), 'Authorization': `Bearer ${authToken}` };
+  }
+  const r = await fetch(url, options);
+  return r;
+}
+
+async function loadDashboard() {
+  const services = [
+    {name:'Auth', url:'/auth/health', port:'8001'},
+    {name:'Product', url:'/products-svc/health', port:'8002'},
+    {name:'Order', url:'/orders-svc/health', port:'8003'},
+    {name:'User', url:'/users-svc/health', port:'8004'},
+    {name:'Chat', url:'/chat-svc/health', port:'8005'},
+  ];
+  const grid = document.getElementById('services-grid');
+  grid.innerHTML = '';
+  for (const svc of services) {
+    try {
+      const r = await fetch(svc.url);
+      const data = await r.json();
+      const ok = r.ok && data.status === 'ok';
+      grid.innerHTML += `
+        <div class="service-card">
+          <div style="margin-bottom:0.5rem;">
+            <span class="service-status ${ok ? 'status-ok' : 'status-down'}"></span>
+            <strong>${svc.name} Service</strong>
+          </div>
+          <div style="color:#94a3b8; font-size:0.8rem;">Port: ${svc.port}</div>
+          <div style="color:${ok?'#4ade80':'#f87171'}; font-size:0.85rem; margin-top:0.3rem;">${ok ? '✅ Healthy' : '❌ Degraded'}</div>
+          ${data.db ? `<div style="font-size:0.75rem; color:#94a3b8;">DB: ${data.db}</div>` : ''}
+        </div>`;
+    } catch(e) {
+      grid.innerHTML += `<div class="service-card"><span class="service-status status-down"></span><strong>${svc.name}</strong><div style="color:#f87171;">❌ Unreachable</div></div>`;
+    }
+  }
+  // Quick stats
+  try {
+    const [pResp, oResp] = await Promise.all([fetch('/products-svc/products'), fetch('/orders-svc/orders')]);
+    const pData = await pResp.json();
+    const oData = await oResp.json();
+    document.getElementById('quick-stats').innerHTML = `
+      <div class="metric-row"><span>Total Products</span><span class="metric-value">${pData.products?.length || 0}</span></div>
+      <div class="metric-row"><span>Total Orders</span><span class="metric-value">${oData.orders?.length || 0}</span></div>
+      <div class="metric-row"><span>Services Running</span><span class="metric-value">5 / 5</span></div>
+      <div class="metric-row"><span>Prometheus</span><span class="metric-value"><a href="http://localhost:9090" target="_blank" style="color:#38bdf8;">:9090</a></span></div>
+      <div class="metric-row"><span>Grafana</span><span class="metric-value"><a href="http://localhost:3000" target="_blank" style="color:#38bdf8;">:3000</a></span></div>
+    `;
+  } catch(e) { document.getElementById('quick-stats').innerHTML = '<span style="color:#94a3b8;">Could not load stats</span>'; }
+}
+
+async function doLogin() {
+  const r = await fetchAPI('/auth/login', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username: document.getElementById('login-user').value, password: document.getElementById('login-pass').value})
+  });
+  const data = await r.json();
+  if (r.ok) {
+    authToken = data.access_token;
+    document.getElementById('auth-status').textContent = document.getElementById('login-user').value;
+    document.getElementById('auth-badge').textContent = '●';
+    document.getElementById('auth-badge').className = 'badge';
+    document.getElementById('token-info').style.display = 'block';
+    document.getElementById('token-display').innerHTML = `
+      <div class="metric-row"><span>Token Type</span><span class="metric-value">Bearer JWT</span></div>
+      <div class="metric-row"><span>Expires</span><span class="metric-value">24 hours</span></div>
+      <div style="margin-top:0.5rem; word-break:break-all; font-family:monospace; font-size:0.7rem; color:#4ade80;">${authToken}</div>
+    `;
+    showAlert('auth', 'Login successful!', 'success');
+  } else {
+    showAlert('auth', data.detail || 'Login failed', 'error');
+  }
+}
+
+async function doRegister() {
+  const r = await fetchAPI('/auth/register', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username: document.getElementById('reg-user').value, email: document.getElementById('reg-email').value, password: document.getElementById('reg-pass').value})
+  });
+  const data = await r.json();
+  showAlert('auth', r.ok ? 'Registration successful! You can now log in.' : (data.detail || 'Registration failed'), r.ok ? 'success' : 'error');
+}
+
+async function loadProducts() {
+  const grid = document.getElementById('products-grid');
+  grid.innerHTML = '<div class="spinner"></div>';
+  try {
+    const r = await fetch('/products-svc/products');
+    const data = await r.json();
+    if (!data.products?.length) { grid.innerHTML = '<p style="color:#94a3b8;">No products found.</p>'; return; }
+    grid.innerHTML = data.products.map(p => `
+      <div class="product-card">
+        <div class="product-name">${p.name}</div>
+        <div class="product-price">$${parseFloat(p.price).toFixed(2)}</div>
+        <div class="product-stock">Stock: ${p.stock} | ID: ${p.id}</div>
+        <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:1rem;">${p.description || ''}</p>
+        <button class="btn btn-primary" style="width:100%;" onclick="quickOrder(${p.id})">🛒 Order</button>
+      </div>`).join('');
+  } catch(e) { grid.innerHTML = `<div class="alert alert-error">Failed to load products: ${e.message}</div>`; }
+}
+
+async function addProduct() {
+  const r = await fetchAPI('/products-svc/products', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name: document.getElementById('prod-name').value, description: document.getElementById('prod-desc').value, price: parseFloat(document.getElementById('prod-price').value), stock: parseInt(document.getElementById('prod-stock').value)})
+  });
+  const data = await r.json();
+  showAlert('products', r.ok ? `Product created (ID: ${data.product_id})` : data.detail, r.ok ? 'success' : 'error');
+  if (r.ok) { loadProducts(); document.getElementById('add-product-form').style.display='none'; }
+}
+
+function quickOrder(pid) {
+  showSection('orders');
+  document.getElementById('order-pid').value = pid;
+  document.querySelectorAll('.nav button')[2].classList.add('active');
+}
+
+async function loadOrders() {
+  const uid = document.getElementById('filter-uid').value;
+  const url = uid ? `/orders-svc/orders?user_id=${uid}` : '/orders-svc/orders';
+  try {
+    const r = await fetch(url);
+    const data = await r.json();
+    if (!r.ok) { document.getElementById('orders-table').innerHTML = `<div class="alert alert-error">${data.detail}</div>`; return; }
+    if (!data.orders?.length) { document.getElementById('orders-table').innerHTML = '<p style="color:#94a3b8;">No orders found.</p>'; return; }
+    document.getElementById('orders-table').innerHTML = `
+      <table class="table">
+        <thead><tr><th>ID</th><th>User</th><th>Product</th><th>Qty</th><th>Total</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody>${data.orders.map(o => `
+          <tr>
+            <td>#${o.id}</td><td>${o.user_id}</td><td>${o.product_id}</td><td>${o.quantity}</td>
+            <td>$${parseFloat(o.total_price||0).toFixed(2)}</td>
+            <td><span class="status-badge status-${o.status}">${o.status}</span></td>
+            <td>${new Date(o.created_at).toLocaleDateString()}</td>
+          </tr>`).join('')}</tbody>
+      </table>`;
+  } catch(e) { document.getElementById('orders-table').innerHTML = `<div class="alert alert-error">Failed to load orders: ${e.message}</div>`; }
+}
+
+async function createOrder() {
+  const r = await fetchAPI('/orders-svc/orders', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({user_id: parseInt(document.getElementById('order-uid').value), product_id: parseInt(document.getElementById('order-pid').value), quantity: parseInt(document.getElementById('order-qty').value)})
+  });
+  const data = await r.json();
+  showAlert('orders', r.ok ? `Order placed! ID: ${data.order_id}, Total: $${data.total_price}` : (data.detail || 'Order failed'), r.ok ? 'success' : 'error');
+  if (r.ok) loadOrders();
+}
+
+async function sendMessage() {
+  const r = await fetchAPI('/chat-svc/messages', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({sender_id: parseInt(document.getElementById('chat-from').value), receiver_id: parseInt(document.getElementById('chat-to').value), content: document.getElementById('chat-msg').value})
+  });
+  const data = await r.json();
+  showAlert('chat', r.ok ? 'Message sent!' : data.detail, r.ok ? 'success' : 'error');
+  if (r.ok) { document.getElementById('chat-msg').value = ''; loadMessages(); }
+}
+
+async function loadMessages() {
+  const from = document.getElementById('chat-from').value;
+  const to = document.getElementById('chat-to').value;
+  try {
+    const r = await fetch(`/chat-svc/messages/${from}?other_user_id=${to}`);
+    const data = await r.json();
+    const list = document.getElementById('messages-list');
+    if (!data.messages?.length) { list.innerHTML = '<p style="color:#94a3b8;">No messages yet.</p>'; return; }
+    list.innerHTML = data.messages.map(m => `
+      <div class="message ${m.sender_id == from ? 'sent' : 'received'}">
+        <div class="message-bubble">${m.content}</div>
+        <div style="font-size:0.7rem; color:#475569; margin-top:2px;">${new Date(m.created_at).toLocaleTimeString()}</div>
+      </div>`).join('');
+  } catch(e) { document.getElementById('messages-list').innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+async function triggerIncident() {
+  const el = document.getElementById('incident-trigger-result');
+  el.innerHTML = '<div class="spinner"></div> Testing Order Service...';
+  try {
+    const r = await fetch('/orders-svc/orders', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({user_id:1,product_id:1,quantity:1})});
+    const data = await r.json();
+    if (r.ok) {
+      el.innerHTML = '<div class="alert alert-success">✅ Order Service is healthy. To simulate an incident, change DATABASE_URL in docker-compose.yml as shown above and restart the service.</div>';
+    } else {
+      el.innerHTML = `<div class="alert alert-error">🚨 INCIDENT ACTIVE: Order Service returning ${r.status} - ${data.detail}</div>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">🚨 INCIDENT ACTIVE: Order Service is unreachable - ${e.message}</div>`;
+  }
+}
+
+async function verifyRecovery() {
+  const el = document.getElementById('recovery-result');
+  el.innerHTML = '<div class="spinner"></div> Verifying...';
+  try {
+    const r = await fetch('/orders-svc/health');
+    const data = await r.json();
+    if (r.ok && data.status === 'ok') {
+      el.innerHTML = '<div class="alert alert-success">✅ Order Service fully recovered! DB connected, all systems operational.</div>';
+    } else {
+      el.innerHTML = `<div class="alert alert-error">⚠️ Service still degraded: ${JSON.stringify(data)}</div>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">❌ Service still unreachable: ${e.message}</div>`;
+  }
+}
+
+// Initial load
+loadDashboard();
+setInterval(loadDashboard, 30000);
+</script>
+</body>
+</html>
