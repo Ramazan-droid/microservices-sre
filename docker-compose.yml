@@ -60,8 +60,8 @@ services:
     container_name: order-service
     environment:
       
-      DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
-      # DATABASE_URL: postgresql://admin:password@wrong-host:5432/microservices
+      # DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
+      DATABASE_URL: postgresql://admin:password@wrong-host:5432/microservices
       PRODUCT_SERVICE_URL: http://product-service:8002
     ports:
       - "8003:8003"
