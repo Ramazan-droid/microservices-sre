@@ -41,7 +41,7 @@ scrape_configs:
       - targets: ['chat-service:8005']
     metrics_path: '/metrics'
 
-  - job_name: 'postgres'
-    static_configs:
-      - targets: ['postgres:5432']
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres:5432']
     # postgres exporter would be needed for full metrics
