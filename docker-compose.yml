@@ -27,8 +27,8 @@ services:
     build: ./services/auth
     container_name: auth-service
     environment:
-      # DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
-      DATABASE_URL: postgresql://admin:password@wrong-host:5432/microservices
+      DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
+      
       SECRET_KEY: supersecretjwtkey12345
     ports:
       - "8001:8001"
@@ -60,7 +60,8 @@ services:
     container_name: order-service
     environment:
       # NOTE: Change this to "wrong-host" to simulate the incident:
-      DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
+      # DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
+      DATABASE_URL: postgresql://admin:password@wrong-host:5432/microservices
       PRODUCT_SERVICE_URL: http://product-service:8002
     ports:
       - "8003:8003"
