@@ -29,6 +29,11 @@ resource "google_compute_firewall" "microservices_sg" {
 
   allow {
     protocol = "tcp"
+    ports    = ["3002"]
+  }
+
+  allow {
+    protocol = "tcp"
     ports    = ["3000"]
   }
 
@@ -61,6 +66,7 @@ resource "google_compute_instance" "microservices_server" {
   name         = "${var.project_name}-server"
   machine_type = var.machine_type
   zone         = var.gcp_zone
+  allow_stopping_for_update = true
 
   tags = ["microservices"]
 
