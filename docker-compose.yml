@@ -26,6 +26,7 @@ services:
   auth-service:
     build: ./services/auth
     container_name: auth-service
+    env_file: .env  
     environment:
       DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
       
@@ -38,11 +39,23 @@ services:
     networks:
       - microservices-net
     restart: unless-stopped
+    healthcheck:                            
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:                                 
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
   # Product Service
   product-service:
     build: ./services/product
     container_name: product-service
+    env_file: .env
     environment:
       DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
     ports:
@@ -53,11 +66,23 @@ services:
     networks:
       - microservices-net
     restart: unless-stopped
+    healthcheck:                            
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:                                 
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
   # Order Service (incident simulation target)
   order-service:
     build: ./services/order
     container_name: order-service
+    env_file: .env 
     environment:
       
       DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
@@ -71,11 +96,23 @@ services:
     networks:
       - microservices-net
     restart: unless-stopped
+    healthcheck:                            
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:                                 
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
 
   # User Service
   user-service:
     build: ./services/user
     container_name: user-service
+    env_file: .env 
     environment:
       DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
     ports:
@@ -86,11 +123,23 @@ services:
     networks:
       - microservices-net
     restart: unless-stopped
+    healthcheck:                            
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:                                 
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
   # Chat Service
   chat-service:
     build: ./services/chat
     container_name: chat-service
+    env_file: .env 
     environment:
       DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
     ports:
@@ -101,6 +150,17 @@ services:
     networks:
       - microservices-net
     restart: unless-stopped
+    healthcheck:                            
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:                                 
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
   # Nginx Frontend & Reverse Proxy
   nginx:
@@ -156,6 +216,17 @@ services:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - prometheus
+    networks:
+      - microservices-net
+    restart: unless-stopped
+
+alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     networks:
       - microservices-net
     restart: unless-stopped

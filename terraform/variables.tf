@@ -38,6 +38,18 @@ variable "machine_type" {
   default     = "e2-micro"
 }
 
+variable "order_service_replicas" {
+  description = "Number of Order Service replicas for horizontal scaling"
+  type        = number
+  default     = 1
+}
+
+variable "scale_machine_type" {
+  description = "Upgraded machine type for vertical scaling under load"
+  type        = string
+  default     = "e2-standard-2"
+}
+
 variable "disk_size_gb" {
   description = "Boot disk size in GB"
   type        = number

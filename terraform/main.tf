@@ -130,3 +130,14 @@ resource "google_compute_instance" "microservices_server" {
     echo "=== Setup complete ==="
   EOF
 }
+
+# ────────────────────────────────────────────
+# Capacity Planning: Scaling Options
+# ────────────────────────────────────────────
+# To scale vertically: change machine_type in terraform.tfvars
+#   Current (baseline): e2-micro   (1 vCPU, 1GB RAM)
+#   Recommended under load: e2-standard-2 (2 vCPU, 8GB RAM)
+#   High load: e2-standard-4 (4 vCPU, 16GB RAM)
+#
+# To scale horizontally: deploy behind a load balancer
+#   resource "google_compute_instance_group_manager" — not yet implemented
