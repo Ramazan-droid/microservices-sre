@@ -220,7 +220,7 @@ services:
       - microservices-net
     restart: unless-stopped
 
-alertmanager:
+  alertmanager:
     image: prom/alertmanager:latest
     container_name: alertmanager
     ports:
