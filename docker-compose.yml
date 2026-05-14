@@ -163,8 +163,8 @@ services:
           memory: 256M
 
   # Nginx Frontend & Reverse Proxy
-  nginx:
-    image: nginx:alpine
+  frontend:
+    build: ./frontend
     container_name: nginx-frontend
     ports:
       - "80:80"
