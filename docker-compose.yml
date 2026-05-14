@@ -163,7 +163,7 @@ services:
           memory: 256M
 
   # Nginx Frontend & Reverse Proxy
-  frontend:
+  nginx:
     build: ./frontend
     container_name: nginx-frontend
     ports:
