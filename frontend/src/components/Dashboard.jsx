@@ -15,6 +15,7 @@ export default function Dashboard() {
       { name: "Order", url: "/orders-svc/health", port: "8003" },
       { name: "User", url: "/users-svc/health", port: "8004" },
       { name: "Chat", url: "/chat-svc/health", port: "8005" },
+      { name: "Review",  url: "/reviews-svc/health",  port: "8006" },
     ];
 
     const results = await Promise.all(
@@ -35,14 +36,17 @@ export default function Dashboard() {
       const [p, o] = await Promise.all([
         fetch("/products-svc/products"),
         fetch("/orders-svc/orders"),
+        fetch("/reviews-svc/reviews"),
       ]);
 
       const pd = await p.json();
       const od = await o.json();
+      const rd = await r.json();
 
       setStats({
         products: pd.products?.length || 0,
         orders: od.orders?.length || 0,
+        reviews:  rd.reviews?.length  || 0,
       });
     } catch {
       setStats(null);
@@ -71,6 +75,7 @@ export default function Dashboard() {
           <>
             <p>Products: {stats.products}</p>
             <p>Orders: {stats.orders}</p>
+            <div><p style={{ fontSize: 28, fontWeight: 700, color: "var(--text)" }}>{stats.reviews}</p><p>Reviews</p></div>
           </>
         ) : (
           <p>Loading...</p>

@@ -162,6 +162,33 @@ services:
           cpus: '0.5'
           memory: 256M
 
+   # Review Service (NEW)
+  review-service:
+    build: ./services/review
+    container_name: review-service
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
+    ports:
+      - "8006:8006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - microservices-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M 
+
   # Nginx Frontend & Reverse Proxy
   nginx:
     build: ./frontend

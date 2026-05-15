@@ -1,5 +1,5 @@
 export default function Header({ page, setPage }) {
-  const items = ["dashboard", "products", "orders", "chat", "auth", "incident"];
+  const items = ["dashboard", "products", "orders","reviews", "chat", "auth", "incident"];
 
   return (
     <div className="header">

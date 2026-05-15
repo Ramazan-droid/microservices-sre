@@ -6,6 +6,7 @@ import Orders from "./components/Orders";
 import Chat from "./components/Chat";
 import Auth from "./components/Auth";
 import Incident from "./components/Incident";
+import Reviews from "./components/Reviews";
 
 export default function App() {
   const [page, setPage] = useState("dashboard");
@@ -18,6 +19,7 @@ export default function App() {
       case "chat": return <Chat />;
       case "auth": return <Auth />;
       case "incident": return <Incident />;
+      case "reviews":   return <Reviews />;
       default: return <Dashboard />;
     }
   };
