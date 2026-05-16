@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-business-pvc
+  namespace: microshop
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-business
+  namespace: microshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-business
+  template:
+    metadata:
+      labels:
+        app: postgres-business
+    spec:
+      containers:
+        - name: postgres-business
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "business_db"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: microshop-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: microshop-secrets
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: postgres-business-storage
+              mountPath: /var/lib/postgresql/data
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "admin", "-d", "business_db"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "admin", "-d", "business_db"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: postgres-business-storage
+          persistentVolumeClaim:
+            claimName: postgres-business-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-business
+  namespace: microshop
+spec:
+  selector:
+    app: postgres-business
+  ports:
+    - port: 5432
+      targetPort: 5432

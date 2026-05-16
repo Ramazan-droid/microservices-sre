@@ -1,0 +1,76 @@
+# PersistentVolumeClaim for identity DB
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-identity-pvc
+  namespace: microshop
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-identity
+  namespace: microshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-identity
+  template:
+    metadata:
+      labels:
+        app: postgres-identity
+    spec:
+      containers:
+        - name: postgres-identity
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "identity_db"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: microshop-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: microshop-secrets
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: postgres-identity-storage
+              mountPath: /var/lib/postgresql/data
+          # Healthcheck
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "admin", "-d", "identity_db"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "admin", "-d", "identity_db"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: postgres-identity-storage
+          persistentVolumeClaim:
+            claimName: postgres-identity-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-identity
+  namespace: microshop
+spec:
+  selector:
+    app: postgres-identity
+  ports:
+    - port: 5432
+      targetPort: 5432

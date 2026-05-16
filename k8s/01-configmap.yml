@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: microshop-config
+  namespace: microshop
+data:
+  # Database URLs
+  IDENTITY_DATABASE_URL: "postgresql://admin:password@postgres-identity:5432/identity_db"
+  BUSINESS_DATABASE_URL: "postgresql://admin:password@postgres-business:5432/business_db"
+  # Service URLs
+  PRODUCT_SERVICE_URL: "http://product-service:8002"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: microshop-secrets
+  namespace: microshop
+type: Opaque
+stringData:
+  SECRET_KEY: "supersecretjwtkey12345"
+  POSTGRES_USER: "admin"
+  POSTGRES_PASSWORD: "password"
