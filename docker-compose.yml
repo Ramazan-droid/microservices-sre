@@ -2,177 +2,194 @@ version: '3.8'
 
 services:
 
-  # PostgreSQL Database
-  postgres:
+  # Database 1: Identity (auth + user)
+  postgres-identity:
     image: postgres:15-alpine
-    container_name: postgres
+    container_name: postgres-identity
     environment:
-      POSTGRES_DB: microservices
+      POSTGRES_DB: identity_db
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_identity_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d microservices"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d identity_db"]
       interval: 60s
       timeout: 5s
       retries: 5
     networks:
       - microservices-net
 
-  # Auth Service
+  # Database 2: Business (product + order + chat + review)
+  postgres-business:
+    image: postgres:15-alpine
+    container_name: postgres-business
+    environment:
+      POSTGRES_DB: business_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_business_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d business_db"]
+      interval: 60s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices-net
+
+  # Auth Service -> identity DB
   auth-service:
     build: ./services/auth
     container_name: auth-service
-    env_file: .env  
+    env_file: .env
     environment:
-      DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
-      
+      DATABASE_URL: postgresql://admin:password@postgres-identity:5432/identity_db
       SECRET_KEY: supersecretjwtkey12345
     ports:
       - "8001:8001"
     depends_on:
-      postgres:
+      postgres-identity:
         condition: service_healthy
     networks:
       - microservices-net
     restart: unless-stopped
-    healthcheck:                            
+    healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 60s
       timeout: 10s
       retries: 3
       start_period: 40s
-    deploy:                                 
+    deploy:
       resources:
         limits:
           cpus: '0.5'
           memory: 256M
 
-  # Product Service
-  product-service:
-    build: ./services/product
-    container_name: product-service
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
-    ports:
-      - "8002:8002"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - microservices-net
-    restart: unless-stopped
-    healthcheck:                            
-      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    deploy:                                 
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-
-  # Order Service (incident simulation target)
-  order-service:
-    build: ./services/order
-    container_name: order-service
-    env_file: .env 
-    environment:
-      
-      DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
-      # DATABASE_URL: postgresql://admin:password@wrong-host:5432/microservices
-      PRODUCT_SERVICE_URL: http://product-service:8002
-    ports:
-      - "8003:8003"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - microservices-net
-    restart: unless-stopped
-    healthcheck:                            
-      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    deploy:                                 
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
-
-  # User Service
+  # User Service -> identity DB
   user-service:
     build: ./services/user
     container_name: user-service
-    env_file: .env 
+    env_file: .env
     environment:
-      DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
+      DATABASE_URL: postgresql://admin:password@postgres-identity:5432/identity_db
     ports:
       - "8004:8004"
     depends_on:
-      postgres:
+      postgres-identity:
         condition: service_healthy
     networks:
       - microservices-net
     restart: unless-stopped
-    healthcheck:                            
+    healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
       interval: 60s
       timeout: 10s
       retries: 3
       start_period: 40s
-    deploy:                                 
+    deploy:
       resources:
         limits:
           cpus: '0.5'
           memory: 256M
 
-  # Chat Service
-  chat-service:
-    build: ./services/chat
-    container_name: chat-service
-    env_file: .env 
+  # Product Service -> business DB
+  product-service:
+    build: ./services/product
+    container_name: product-service
+    env_file: .env
     environment:
-      DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
+      DATABASE_URL: postgresql://admin:password@postgres-business:5432/business_db
     ports:
-      - "8005:8005"
+      - "8002:8002"
     depends_on:
-      postgres:
+      postgres-business:
         condition: service_healthy
     networks:
       - microservices-net
     restart: unless-stopped
-    healthcheck:                            
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # Order Service -> business DB
+  order-service:
+    build: ./services/order
+    container_name: order-service
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://admin:password@postgres-business:5432/business_db
+      PRODUCT_SERVICE_URL: http://product-service:8002
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres-business:
+        condition: service_healthy
+    networks:
+      - microservices-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # Chat Service -> business DB
+  chat-service:
+    build: ./services/chat
+    container_name: chat-service
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://admin:password@postgres-business:5432/business_db
+    ports:
+      - "8005:8005"
+    depends_on:
+      postgres-business:
+        condition: service_healthy
+    networks:
+      - microservices-net
+    restart: unless-stopped
+    healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
       interval: 60s
       timeout: 10s
       retries: 3
       start_period: 40s
-    deploy:                                 
+    deploy:
       resources:
         limits:
           cpus: '0.5'
           memory: 256M
 
-   # Review Service (NEW)
+  # Review Service -> business DB
   review-service:
     build: ./services/review
     container_name: review-service
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://admin:password@postgres:5432/microservices
+      DATABASE_URL: postgresql://admin:password@postgres-business:5432/business_db
     ports:
       - "8006:8006"
     depends_on:
-      postgres:
+      postgres-business:
         condition: service_healthy
     networks:
       - microservices-net
@@ -187,9 +204,9 @@ services:
       resources:
         limits:
           cpus: '0.5'
-          memory: 256M 
+          memory: 256M
 
-  # Nginx Frontend & Reverse Proxy
+  # Nginx
   nginx:
     build: ./frontend
     container_name: nginx-frontend
@@ -204,6 +221,7 @@ services:
       - order-service
       - user-service
       - chat-service
+      - review-service
     networks:
       - microservices-net
     restart: unless-stopped
@@ -259,7 +277,8 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  postgres_identity_data:
+  postgres_business_data:
   prometheus_data:
   grafana_data:
 
