@@ -215,9 +215,9 @@
   become: true
 
 # ── Handlers ─────────────────────────────────
-handlers:
-  - name: Restart sshd
-    ansible.builtin.systemd:
-      name: sshd
-      state: restarted
-    become: true
+# handlers:
+#   - name: Restart sshd
+#     ansible.builtin.systemd:
+#       name: sshd
+#       state: restarted
+#     become: true

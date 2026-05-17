@@ -171,19 +171,19 @@
     msg: "Prometheus has {{ active_target_count }} target(s) in UP state"
 
 # ── Handlers ─────────────────────────────────
-handlers:
-  - name: Restart prometheus
-    community.docker.docker_compose_v2:
-      project_src: /opt/monitoring
-      services:
-        - prometheus
-      state: restarted
-    become: true
+# handlers:
+#   - name: Restart prometheus
+#     community.docker.docker_compose_v2:
+#       project_src: /opt/monitoring
+#       services:
+#         - prometheus
+#       state: restarted
+#     become: true
 
-  - name: Restart alertmanager
-    community.docker.docker_compose_v2:
-      project_src: /opt/monitoring
-      services:
-        - alertmanager
-      state: restarted
-    become: true
+#   - name: Restart alertmanager
+#     community.docker.docker_compose_v2:
+#       project_src: /opt/monitoring
+#       services:
+#         - alertmanager
+#       state: restarted
+#     become: true
