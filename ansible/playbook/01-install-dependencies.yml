@@ -52,7 +52,7 @@
       tags: [python]
 
 - name: Install Docker Engine
-  hosts: k8s_cluster
+  hosts: all
   become: true
   gather_facts: true
   roles:
@@ -60,7 +60,7 @@
   tags: [docker]
 
 - name: Install Kubernetes binaries
-  hosts: k8s_cluster
+  hosts: all
   become: true
   gather_facts: true
   tasks:
