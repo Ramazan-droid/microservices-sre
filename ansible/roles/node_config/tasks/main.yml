@@ -77,7 +77,7 @@
     - "10250"  # kubelet API
     - "10251"  # kube-scheduler
     - "10252"  # kube-controller-manager
-  when: inventory_hostname in groups['control_plane']
+  # when: inventory_hostname in groups['control_plane']
   become: true
 
 - name: Open worker-node ports
@@ -88,7 +88,7 @@
   loop:
     - "10250"        # kubelet API
     - "30000:32767"  # NodePort range
-  when: inventory_hostname in groups['worker_nodes']
+  # when: inventory_hostname in groups['worker_nodes']
   become: true
 
 - name: Open microservice ports (direct access)
