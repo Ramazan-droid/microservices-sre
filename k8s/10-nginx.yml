@@ -19,7 +19,6 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
-              hostPort: 80
           livenessProbe:
             httpGet:
               path: /
@@ -55,3 +54,22 @@ spec:
     - port: 80
       targetPort: 80
       # nodePort: 30080   # access via http://<server-ip>:30080
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-ingress
+  namespace: microshop
+  annotations:
+    kubernetes.io/ingress.class: traefik
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nginx
+                port:
+                  number: 80
