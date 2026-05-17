@@ -60,9 +60,8 @@ kind: Ingress
 metadata:
   name: nginx-ingress
   namespace: microshop
-  annotations:
-    kubernetes.io/ingress.class: traefik
 spec:
+  ingressClassName: traefik
   rules:
     - http:
         paths:
