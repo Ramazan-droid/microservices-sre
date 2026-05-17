@@ -19,6 +19,7 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
+              hostPort: 80
           livenessProbe:
             httpGet:
               path: /
@@ -53,4 +54,4 @@ spec:
   ports:
     - port: 80
       targetPort: 80
-      nodePort: 30080   # access via http://<server-ip>:30080
+      # nodePort: 30080   # access via http://<server-ip>:30080
