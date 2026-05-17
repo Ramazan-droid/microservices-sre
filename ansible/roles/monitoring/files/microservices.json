@@ -1,0 +1,139 @@
+{
+  "id": null,
+  "uid": "microservices-overview",
+  "title": "Microservices Overview",
+  "tags": ["microservices", "sre"],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Service Request Rate",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "rate(auth_requests_total[1m])", "legendFormat": "Auth", "refId": "A" },
+        { "expr": "rate(product_requests_total[1m])", "legendFormat": "Product", "refId": "B" },
+        { "expr": "rate(order_requests_total[1m])", "legendFormat": "Order", "refId": "C" },
+        { "expr": "rate(user_requests_total[1m])", "legendFormat": "User", "refId": "D" },
+        { "expr": "rate(chat_requests_total[1m])", "legendFormat": "Chat", "refId": "E" }
+      ],
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps" }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Order Service Error Rate",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "rate(order_requests_total{status=\"500\"}[1m])", "legendFormat": "5xx Errors", "refId": "A" },
+        { "expr": "rate(order_db_connection_errors_total[1m])", "legendFormat": "DB Connection Errors", "refId": "B" },
+        { "expr": "rate(order_failures_total[1m])", "legendFormat": "Total Failures", "refId": "C" }
+      ],
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "red" }, "unit": "reqps" }
+      },
+      "alert": {
+        "conditions": [
+          { "evaluator": { "params": [0], "type": "gt" }, "operator": { "type": "and" }, "query": { "params": ["A", "1m", "now"] }, "reducer": { "params": [], "type": "avg" }, "type": "query" }
+        ],
+        "executionErrorState": "alerting",
+        "for": "30s",
+        "frequency": "10s",
+        "handler": 1,
+        "name": "Order Service Error Rate Alert",
+        "noDataState": "no_data",
+        "notifications": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Request Latency P99 (Order Service)",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(order_request_duration_seconds_bucket[5m]))", "legendFormat": "P50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, rate(order_request_duration_seconds_bucket[5m]))", "legendFormat": "P95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, rate(order_request_duration_seconds_bucket[5m]))", "legendFormat": "P99", "refId": "C" }
+      ],
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 4,
+      "title": "Active Orders",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "order_active_orders", "legendFormat": "Active Orders", "refId": "A" }
+      ],
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{"color":"green","value":null},{"color":"yellow","value":10},{"color":"red","value":50}] } } }
+    },
+    {
+      "id": 5,
+      "title": "DB Connection Errors (Order Service)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
+      "targets": [
+        { "expr": "order_db_connection_errors_total", "legendFormat": "DB Errors", "refId": "A" }
+      ],
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{"color":"green","value":null},{"color":"red","value":1}] } } }
+    },
+    {
+      "id": 6,
+      "title": "Chat Active WebSocket Connections",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 12 },
+      "targets": [
+        { "expr": "chat_active_websocket_connections", "refId": "A" }
+      ],
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{"color":"green","value":null}] } } }
+    },
+    {
+      "id": 7,
+      "title": "Total Messages Sent",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 12 },
+      "targets": [
+        { "expr": "chat_messages_total", "refId": "A" }
+      ],
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{"color":"blue","value":null}] } } }
+    },
+    {
+      "id": 8,
+      "title": "Auth Request Latency",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, rate(auth_request_duration_seconds_bucket[5m]))", "legendFormat": "Auth P95", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, rate(product_request_duration_seconds_bucket[5m]))", "legendFormat": "Product P95", "refId": "B" },
+        { "expr": "histogram_quantile(0.95, rate(user_request_duration_seconds_bucket[5m]))", "legendFormat": "User P95", "refId": "C" }
+      ],
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 9,
+      "title": "HTTP Status Distribution (All Services)",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "sum by(status) (rate(order_requests_total[1m]))", "legendFormat": "Order {{status}}", "refId": "A" },
+        { "expr": "sum by(status) (rate(product_requests_total[1m]))", "legendFormat": "Product {{status}}", "refId": "B" }
+      ],
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    }
+  ]
+}

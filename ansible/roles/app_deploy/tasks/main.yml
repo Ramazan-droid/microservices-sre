@@ -1,0 +1,200 @@
+---
+# ─────────────────────────────────────────────
+# roles/app_deploy/tasks/main.yml
+# Deploy the MicroShop application stack to
+# Kubernetes using the existing manifests
+# ─────────────────────────────────────────────
+
+# ── 1. Copy manifests to master ───────────────
+- name: Create k8s manifests directory on master
+  ansible.builtin.file:
+    path: "{{ app_repo_dir }}/k8s"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+  become: true
+
+- name: Upload Kubernetes manifests
+  ansible.builtin.copy:
+    src: "../k8s/{{ item }}"
+    dest: "{{ app_repo_dir }}/k8s/"
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+  loop:
+    - k8s/00-namespace.yml
+    - k8s/01-configmap.yml
+    - k8s/02-postgres-identity.yml
+    - k8s/03-postgres-business.yml
+    - k8s/04-auth-service.yml
+    - k8s/05-user-service.yml
+    - k8s/06-product-service.yml
+    - k8s/07-order-service.yml
+    - k8s/08-chat-service.yml
+    - k8s/09-review-service.yml
+    - k8s/10-nginx.yml
+    - k8s/11-hpa.yml
+
+# ── 2. Patch configmap with live values ───────
+- name: Create microshop ConfigMap manifest
+  ansible.builtin.template:
+    src: configmap.yml.j2
+    dest: "{{ app_repo_dir }}/k8s/01-configmap.yml"
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+
+# ── 3. Apply namespace first ─────────────────
+- name: Apply namespace
+  kubernetes.core.k8s:
+    kubeconfig: /home/ubuntu/.kube/config
+    src: "{{ app_repo_dir }}/k8s/00-namespace.yml"
+    state: present
+
+# ── 4. Apply ConfigMap and Secrets ───────────
+- name: Apply ConfigMap
+  kubernetes.core.k8s:
+    kubeconfig: /home/ubuntu/.kube/config
+    src: "{{ app_repo_dir }}/k8s/01-configmap.yml"
+    state: present
+
+- name: Create Kubernetes Secret for database credentials
+  kubernetes.core.k8s:
+    kubeconfig: /home/ubuntu/.kube/config
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: microshop-secrets
+        namespace: "{{ k8s_namespace }}"
+      type: Opaque
+      stringData:
+        SECRET_KEY: "{{ secret_key }}"
+        POSTGRES_USER: "{{ postgres_user }}"
+        POSTGRES_PASSWORD: "{{ postgres_password }}"
+
+# ── 5. Deploy databases ───────────────────────
+- name: Deploy postgres-identity
+  kubernetes.core.k8s:
+    kubeconfig: /home/ubuntu/.kube/config
+    src: "{{ app_repo_dir }}/k8s/02-postgres-identity.yml"
+    state: present
+
+- name: Deploy postgres-business
+  kubernetes.core.k8s:
+    kubeconfig: /home/ubuntu/.kube/config
+    src: "{{ app_repo_dir }}/k8s/03-postgres-business.yml"
+    state: present
+
+- name: Wait for postgres-identity to be ready
+  kubernetes.core.k8s_info:
+    kubeconfig: /home/ubuntu/.kube/config
+    kind: StatefulSet
+    name: postgres-identity
+    namespace: "{{ k8s_namespace }}"
+    wait: true
+    wait_condition:
+      type: Ready
+      status: "True"
+    wait_timeout: 120
+
+- name: Wait for postgres-business to be ready
+  kubernetes.core.k8s_info:
+    kubeconfig: /home/ubuntu/.kube/config
+    kind: StatefulSet
+    name: postgres-business
+    namespace: "{{ k8s_namespace }}"
+    wait: true
+    wait_condition:
+      type: Ready
+      status: "True"
+    wait_timeout: 120
+
+# ── 6. Deploy microservices ───────────────────
+- name: Deploy microservices
+  kubernetes.core.k8s:
+    kubeconfig: /home/ubuntu/.kube/config
+    src: "{{ app_repo_dir }}/k8s/{{ item }}"
+    state: present
+  loop:
+    - 04-auth-service.yml
+    - 05-user-service.yml
+    - 06-product-service.yml
+    - 07-order-service.yml
+    - 08-chat-service.yml
+    - 09-review-service.yml
+
+- name: Wait for all microservice deployments to be ready
+  kubernetes.core.k8s_info:
+    kubeconfig: /home/ubuntu/.kube/config
+    kind: Deployment
+    name: "{{ item }}"
+    namespace: "{{ k8s_namespace }}"
+    wait: true
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: 180
+  loop:
+    - auth-service
+    - user-service
+    - product-service
+    - order-service
+    - chat-service
+    - review-service
+
+# ── 7. Deploy ingress (nginx) + HPA ──────────
+- name: Deploy nginx ingress
+  kubernetes.core.k8s:
+    kubeconfig: /home/ubuntu/.kube/config
+    src: "{{ app_repo_dir }}/k8s/10-nginx.yml"
+    state: present
+
+- name: Deploy Horizontal Pod Autoscalers
+  kubernetes.core.k8s:
+    kubeconfig: /home/ubuntu/.kube/config
+    src: "{{ app_repo_dir }}/k8s/11-hpa.yml"
+    state: present
+
+# ── 8. Validate deployment ────────────────────
+- name: Get all pods in namespace
+  kubernetes.core.k8s_info:
+    kubeconfig: /home/ubuntu/.kube/config
+    kind: Pod
+    namespace: "{{ k8s_namespace }}"
+  register: pod_list
+
+- name: Show pod statuses
+  ansible.builtin.debug:
+    msg: >
+      Pod {{ item.metadata.name }}:
+      {{ item.status.phase }} –
+      {{ item.status.conditions | selectattr('type','equalto','Ready') | map(attribute='status') | first | default('Unknown') }}
+  loop: "{{ pod_list.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+
+- name: Verify all pods are Running
+  ansible.builtin.assert:
+    that:
+      - item.status.phase == "Running"
+    fail_msg: "Pod {{ item.metadata.name }} is not Running ({{ item.status.phase }})"
+    success_msg: "Pod {{ item.metadata.name }} is Running"
+  loop: "{{ pod_list.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  ignore_errors: true   # non-fatal; alert instead of aborting
+
+# ── 9. Health-check each service endpoint ────
+- name: Wait for auth-service health endpoint
+  ansible.builtin.uri:
+    url: "http://{{ k8s_master_ip }}:{{ service_ports.auth }}/health"
+    method: GET
+    status_code: 200
+  register: auth_health
+  until: auth_health.status == 200
+  retries: "{{ healthcheck_retries }}"
+  delay: "{{ healthcheck_delay }}"
+  ignore_errors: true

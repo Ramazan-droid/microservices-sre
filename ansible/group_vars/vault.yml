@@ -1,0 +1,6 @@
+---
+# ─────────────────────────────────────────────
+# group_vars/vault.yml  
+# ─────────────────────────────────────────────
+vault_postgres_password: "password"
+vault_secret_key: "supersecretjwtkey12345"

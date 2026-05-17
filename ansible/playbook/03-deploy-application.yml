@@ -1,0 +1,51 @@
+---
+# ─────────────────────────────────────────────
+# playbooks/03-deploy-application.yml
+# Task 3: Deploy application stack
+# (namespaces → databases → microservices → ingress → HPA)
+# ─────────────────────────────────────────────
+
+- name: Deploy MicroShop microservices to Kubernetes
+  hosts: control_plane
+  become: false
+  gather_facts: true
+
+  pre_tasks:
+    - name: Confirm cluster is reachable
+      ansible.builtin.command: kubectl cluster-info
+      environment:
+        KUBECONFIG: /home/ubuntu/.kube/config
+      changed_when: false
+      register: cluster_info
+
+    - name: Print cluster info
+      ansible.builtin.debug:
+        msg: "{{ cluster_info.stdout_lines }}"
+
+  roles:
+    - role: app_deploy
+
+  post_tasks:
+    - name: Final pod status
+      ansible.builtin.command: >
+        kubectl get pods -n {{ k8s_namespace }} -o wide
+      environment:
+        KUBECONFIG: /home/ubuntu/.kube/config
+      changed_when: false
+      register: final_pods
+
+    - name: Print pod list
+      ansible.builtin.debug:
+        msg: "{{ final_pods.stdout_lines }}"
+
+    - name: Final service status
+      ansible.builtin.command: >
+        kubectl get services -n {{ k8s_namespace }}
+      environment:
+        KUBECONFIG: /home/ubuntu/.kube/config
+      changed_when: false
+      register: final_svcs
+
+    - name: Print service list
+      ansible.builtin.debug:
+        msg: "{{ final_svcs.stdout_lines }}"

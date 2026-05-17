@@ -1,0 +1,47 @@
+---
+# ─────────────────────────────────────────────
+# site.yml – Master playbook
+# Runs every role in the correct order.
+# Run: ansible-playbook -i inventory/hosts.ini site.yml --ask-vault-pass
+# ─────────────────────────────────────────────
+
+- name: "01 – Configure all nodes (baseline)"
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - role: node_config
+  tags: [node, baseline]
+
+- name: "02 – Install Docker on all cluster nodes"
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+  roles:
+    - role: docker
+  tags: [docker]
+
+- name: "03 – Install and bootstrap Kubernetes"
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+  roles:
+    - role: kubernetes
+  tags: [kubernetes, k8s]
+
+- name: "04 – Deploy MicroShop application stack"
+  hosts: control_plane
+  become: false
+  gather_facts: true
+  roles:
+    - role: app_deploy
+  tags: [deploy, app]
+
+- name: "05 – Deploy monitoring stack"
+  hosts: monitoring_nodes
+  become: true
+  gather_facts: true
+  roles:
+    - role: docker       # monitoring host also needs docker
+    - role: monitoring
+  tags: [monitoring, observability]

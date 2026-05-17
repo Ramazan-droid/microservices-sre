@@ -1,0 +1,220 @@
+---
+# ─────────────────────────────────────────────
+# roles/kubernetes/tasks/main.yml
+# Install Kubernetes (kubeadm + kubelet + kubectl)
+# and bootstrap the cluster
+# ─────────────────────────────────────────────
+
+# ── 1. Kernel prerequisites ──────────────────
+- name: Load required kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+  become: true
+
+- name: Persist kernel modules across reboots
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: "0644"
+  become: true
+
+- name: Set sysctl parameters for Kubernetes networking
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: true
+  loop:
+    - { key: "net.bridge.bridge-nf-call-iptables",  value: "1" }
+    - { key: "net.bridge.bridge-nf-call-ip6tables", value: "1" }
+    - { key: "net.ipv4.ip_forward",                 value: "1" }
+  become: true
+
+# ── 2. Disable swap (Kubernetes requirement) ──
+- name: Disable swap immediately
+  ansible.builtin.command: swapoff -a
+  changed_when: false
+  become: true
+
+- name: Remove swap from /etc/fstab permanently
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\s+swap\s+.*)$'
+    replace: '# \1'
+  become: true
+
+# ── 3. Install containerd (CRI) ───────────────
+- name: Install containerd
+  ansible.builtin.apt:
+    name: containerd.io
+    state: present
+    update_cache: true
+  become: true
+
+- name: Create containerd config directory
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Generate default containerd configuration
+  ansible.builtin.shell: containerd config default > /etc/containerd/config.toml
+  args:
+    creates: /etc/containerd/config.toml
+  become: true
+
+- name: Enable SystemdCgroup in containerd config
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    replace: 'SystemdCgroup = true'
+  become: true
+
+- name: Restart and enable containerd
+  ansible.builtin.systemd:
+    name: containerd
+    state: restarted
+    enabled: true
+  become: true
+
+# ── 4. Add Kubernetes APT repository ─────────
+- name: Add Kubernetes GPG key
+  ansible.builtin.shell: |
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/Release.key \
+      | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  args:
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  become: true
+
+- name: Add Kubernetes APT repository
+  ansible.builtin.apt_repository:
+    repo: >
+      deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg]
+      https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/ /
+    state: present
+    filename: kubernetes
+  become: true
+
+- name: Install kubelet, kubeadm, kubectl
+  ansible.builtin.apt:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: present
+    update_cache: true
+  become: true
+
+- name: Hold Kubernetes packages at current version
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+  become: true
+
+- name: Enable and start kubelet
+  ansible.builtin.systemd:
+    name: kubelet
+    enabled: true
+    state: started
+  become: true
+
+# ── 5. Initialise control-plane (master only) ─
+- name: Check if cluster already initialised
+  ansible.builtin.stat:
+    path: /etc/kubernetes/admin.conf
+  register: kubeconfig_stat
+  when: inventory_hostname in groups['control_plane']
+
+- name: Initialise Kubernetes cluster (kubeadm init)
+  ansible.builtin.command: >
+    kubeadm init
+    --pod-network-cidr={{ pod_network_cidr }}
+    --apiserver-advertise-address={{ k8s_master_ip }}
+    --kubernetes-version=v{{ kubernetes_version }}.0
+  when:
+    - inventory_hostname in groups['control_plane']
+    - not kubeconfig_stat.stat.exists
+  become: true
+  register: kubeadm_init_output
+
+- name: Create .kube directory for ubuntu user
+  ansible.builtin.file:
+    path: /home/ubuntu/.kube
+    state: directory
+    mode: "0755"
+    owner: ubuntu
+    group: ubuntu
+  when: inventory_hostname in groups['control_plane']
+  become: true
+
+- name: Copy admin.conf to ubuntu user's kube config
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/ubuntu/.kube/config
+    remote_src: true
+    owner: ubuntu
+    group: ubuntu
+    mode: "0600"
+  when: inventory_hostname in groups['control_plane']
+  become: true
+
+# ── 6. Install Flannel CNI ────────────────────
+- name: Apply Flannel CNI manifest
+  ansible.builtin.command: >
+    kubectl apply -f
+    https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  when: inventory_hostname in groups['control_plane']
+  become: false
+
+# ── 7. Generate join command and join workers ─
+- name: Generate worker join command
+  ansible.builtin.command: kubeadm token create --print-join-command
+  register: join_command
+  when: inventory_hostname in groups['control_plane']
+  become: true
+  changed_when: false
+
+- name: Store join command as fact
+  ansible.builtin.set_fact:
+    k8s_join_command: "{{ join_command.stdout }}"
+  when: inventory_hostname in groups['control_plane']
+
+- name: Check if node has already joined the cluster
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_conf_stat
+  when: inventory_hostname in groups['worker_nodes']
+
+- name: Join worker nodes to cluster
+  ansible.builtin.command: >
+    {{ hostvars[groups['control_plane'][0]]['k8s_join_command'] }}
+  when:
+    - inventory_hostname in groups['worker_nodes']
+    - not kubelet_conf_stat.stat.exists
+  become: true
+
+- name: Verify cluster nodes
+  ansible.builtin.command: kubectl get nodes -o wide
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  when: inventory_hostname in groups['control_plane']
+  register: cluster_nodes
+  changed_when: false
+
+- name: Print cluster nodes
+  ansible.builtin.debug:
+    msg: "{{ cluster_nodes.stdout_lines }}"
+  when: inventory_hostname in groups['control_plane']

@@ -1,0 +1,100 @@
+---
+# ─────────────────────────────────────────────
+# playbooks/01-install-dependencies.yml
+# Task 1: Install all dependencies
+# (Docker, Kubernetes toolchain, common utilities)
+# ─────────────────────────────────────────────
+
+- name: Install system dependencies on all nodes
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+
+    - name: Update apt cache and upgrade packages
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: dist
+        autoremove: true
+      tags: [packages]
+
+    - name: Install system utilities
+      ansible.builtin.apt:
+        name:
+          - curl
+          - wget
+          - git
+          - vim
+          - htop
+          - net-tools
+          - unzip
+          - jq
+          - python3-pip
+          - python3-venv
+          - nfs-common
+          - open-iscsi
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - lsb-release
+        state: present
+      tags: [packages]
+
+    - name: Install Python Kubernetes SDK (for Ansible k8s module)
+      ansible.builtin.pip:
+        name:
+          - kubernetes
+          - openshift
+          - docker
+          - docker-compose
+        state: present
+        extra_args: --break-system-packages
+      tags: [python]
+
+- name: Install Docker Engine
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+  roles:
+    - role: docker
+  tags: [docker]
+
+- name: Install Kubernetes binaries
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+  tasks:
+
+    - name: Load kernel modules
+      community.general.modprobe:
+        name: "{{ item }}"
+        state: present
+      loop: [overlay, br_netfilter]
+
+    - name: Add Kubernetes GPG key
+      ansible.builtin.shell: |
+        curl -fsSL https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/Release.key \
+          | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+    - name: Add Kubernetes APT repository
+      ansible.builtin.apt_repository:
+        repo: >
+          deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg]
+          https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/ /
+        state: present
+        filename: kubernetes
+
+    - name: Install kubeadm, kubelet, kubectl
+      ansible.builtin.apt:
+        name: [kubelet, kubeadm, kubectl]
+        state: present
+        update_cache: true
+
+    - name: Hold Kubernetes packages
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop: [kubelet, kubeadm, kubectl]
+  tags: [kubernetes]

@@ -1,0 +1,53 @@
+---
+# ─────────────────────────────────────────────
+# group_vars/all.yml
+# Global variables applied to every host
+# ─────────────────────────────────────────────
+
+# ── Project metadata ──────────────────────────
+project_name: microshop
+k8s_namespace: microshop
+app_repo_dir: /opt/microshop
+
+# ── Docker ────────────────────────────────────
+docker_version: "27.0"
+docker_compose_version: "2.27.0"
+docker_users:
+  - ubuntu
+
+# ── Kubernetes ────────────────────────────────
+kubernetes_version: "1.30"
+pod_network_cidr: "10.244.0.0/16"
+k8s_master_ip: "10.0.1.10"
+
+# ── Registry ──────────────────────────────────
+container_registry: "ghcr.io/your-org/microshop"
+
+# ── Database credentials ──────────────────────
+postgres_user: admin
+postgres_password: "{{ vault_postgres_password }}"    # set in vault
+postgres_identity_db: identity_db
+postgres_business_db: business_db
+
+# ── Auth ──────────────────────────────────────
+secret_key: "{{ vault_secret_key }}"                  # set in vault
+
+# ── Service ports ─────────────────────────────
+service_ports:
+  auth:    8001
+  product: 8002
+  order:   8003
+  user:    8004
+  chat:    8005
+  review:  8006
+
+# ── Monitoring ────────────────────────────────
+prometheus_version: "2.52.0"
+grafana_version: "11.0.0"
+alertmanager_version: "0.27.0"
+prometheus_scrape_interval: "15s"
+alertmanager_webhook_url: "http://localhost:5001/alerts"
+
+# ── Timeouts / retries ────────────────────────
+healthcheck_retries: 5
+healthcheck_delay: 10

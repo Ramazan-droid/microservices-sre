@@ -1,0 +1,39 @@
+---
+# Rendered by Ansible for {{ inventory_hostname }}
+global:
+  scrape_interval:     {{ prometheus_scrape_interval }}
+  evaluation_interval: {{ prometheus_scrape_interval }}
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+rule_files:
+  - "alerts.yml"
+
+scrape_configs:
+  # ── Prometheus self-monitoring ──
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ── Node exporters on every cluster host ──
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets:
+{% for host in groups['k8s_cluster'] %}
+          - '{{ hostvars[host].ansible_host }}:9100'
+{% endfor %}
+
+  # ── Microservices ──
+{% for svc, port in service_ports.items() %}
+  - job_name: '{{ svc }}-service'
+    static_configs:
+      - targets: ['{{ k8s_master_ip }}:{{ port }}']
+    metrics_path: '/metrics'
+{% if svc == 'order' %}
+    scrape_interval: 5s
+{% endif %}
+
+{% endfor %}

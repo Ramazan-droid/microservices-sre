@@ -1,0 +1,87 @@
+---
+# ─────────────────────────────────────────────
+# playbooks/04-configure-monitoring.yml
+# Task 4: Configure monitoring tools
+# (Prometheus · Grafana · Alertmanager · node-exporter)
+# ─────────────────────────────────────────────
+
+- name: Ensure Docker is installed on monitoring node
+  hosts: monitoring_nodes
+  become: true
+  gather_facts: true
+  roles:
+    - role: docker
+  tags: [docker]
+
+- name: Deploy monitoring stack
+  hosts: monitoring_nodes
+  become: true
+  gather_facts: true
+  roles:
+    - role: monitoring
+  tags: [monitoring]
+
+- name: Validate monitoring endpoints
+  hosts: monitoring_nodes
+  become: false
+  gather_facts: false
+  tasks:
+
+    - name: Prometheus health check
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:9090/-/ready"
+        status_code: 200
+      register: prometheus_check
+      retries: 5
+      delay: 10
+      until: prometheus_check.status == 200
+      tags: [validate]
+
+    - name: Grafana health check
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:3000/api/health"
+        status_code: 200
+      register: grafana_check
+      retries: 5
+      delay: 10
+      until: grafana_check.status == 200
+      tags: [validate]
+
+    - name: Alertmanager health check
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:9093/-/ready"
+        status_code: 200
+      register: alertmanager_check
+      retries: 5
+      delay: 10
+      until: alertmanager_check.status == 200
+      tags: [validate]
+
+    - name: Print monitoring URLs
+      ansible.builtin.debug:
+        msg:
+          - "Prometheus  → http://{{ ansible_host }}:9090"
+          - "Grafana     → http://{{ ansible_host }}:3000  (admin / <vault_password>)"
+          - "Alertmanager→ http://{{ ansible_host }}:9093"
+      tags: [validate]
+
+- name: Verify node-exporter on all cluster nodes
+  hosts: k8s_cluster
+  become: false
+  gather_facts: false
+  tasks:
+
+    - name: Check node-exporter is responding
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:9100/metrics"
+        status_code: 200
+      register: ne_check
+      retries: 3
+      delay: 5
+      until: ne_check.status == 200
+      tags: [validate, node-exporter]
+
+    - name: Confirm node-exporter metrics are available
+      ansible.builtin.debug:
+        msg: "node-exporter UP on {{ inventory_hostname }} ({{ ansible_host }}:9100)"
+      tags: [validate, node-exporter]

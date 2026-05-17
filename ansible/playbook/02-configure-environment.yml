@@ -1,0 +1,59 @@
+---
+# ─────────────────────────────────────────────
+# playbooks/02-configure-environment.yml
+# Task 2: Configure environment
+# (node hardening, firewall, sysctl, Kubernetes bootstrap)
+# ─────────────────────────────────────────────
+
+- name: Baseline node configuration
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - role: node_config
+  tags: [node, baseline]
+
+- name: Bootstrap Kubernetes cluster
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+  roles:
+    - role: kubernetes
+  tags: [k8s, cluster]
+
+- name: Configure environment variables and application directory
+  hosts: k8s_cluster
+  become: true
+  gather_facts: false
+  tasks:
+
+    - name: Create application directory
+      ansible.builtin.file:
+        path: "{{ app_repo_dir }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Write .env file for Docker Compose
+      ansible.builtin.template:
+        src: ../roles/app_deploy/templates/configmap.yml.j2
+        dest: "{{ app_repo_dir }}/.env"
+        owner: ubuntu
+        group: ubuntu
+        mode: "0600"
+      no_log: true
+
+    - name: Verify kubeconfig is accessible
+      ansible.builtin.stat:
+        path: /home/ubuntu/.kube/config
+      register: kc
+      when: inventory_hostname in groups['control_plane']
+
+    - name: Fail if kubeconfig is missing
+      ansible.builtin.fail:
+        msg: "kubeconfig not found – did the Kubernetes role run successfully?"
+      when:
+        - inventory_hostname in groups['control_plane']
+        - not kc.stat.exists
+  tags: [env, config]

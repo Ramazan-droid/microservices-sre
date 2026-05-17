@@ -1,0 +1,189 @@
+---
+# ─────────────────────────────────────────────
+# roles/monitoring/tasks/main.yml
+# Deploy Prometheus · Grafana · Alertmanager
+# as Docker Compose on the monitoring node,
+# AND register Kubernetes node-exporter targets.
+# ─────────────────────────────────────────────
+
+# ── 1. Create directory layout ────────────────
+- name: Create monitoring directory structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+  loop:
+    - /opt/monitoring
+    - /opt/monitoring/prometheus
+    - /opt/monitoring/alertmanager
+    - /opt/monitoring/grafana/provisioning/dashboards
+    - /opt/monitoring/grafana/provisioning/datasources
+    - /opt/monitoring/grafana/data
+  become: true
+
+# ── 2. Prometheus configuration ───────────────
+- name: Template Prometheus configuration
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: /opt/monitoring/prometheus/prometheus.yml
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+  become: true
+  notify: Restart prometheus
+
+- name: Copy Prometheus alert rules
+  ansible.builtin.copy:
+    src: alerts.yml
+    dest: /opt/monitoring/prometheus/alerts.yml
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+  become: true
+  notify: Restart prometheus
+
+# ── 3. Alertmanager configuration ────────────
+- name: Template Alertmanager configuration
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: /opt/monitoring/alertmanager/alertmanager.yml
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+  become: true
+  notify: Restart alertmanager
+
+# ── 4. Grafana datasource ─────────────────────
+- name: Configure Grafana Prometheus datasource
+  ansible.builtin.copy:
+    dest: /opt/monitoring/grafana/provisioning/datasources/prometheus.yml
+    content: |
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://prometheus:9090
+          isDefault: true
+          editable: false
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+  become: true
+
+- name: Configure Grafana dashboard provisioner
+  ansible.builtin.copy:
+    dest: /opt/monitoring/grafana/provisioning/dashboards/dashboard.yml
+    content: |
+      apiVersion: 1
+      providers:
+        - name: default
+          orgId: 1
+          type: file
+          disableDeletion: false
+          updateIntervalSeconds: 30
+          options:
+            path: /var/lib/grafana/dashboards
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+  become: true
+
+- name: Copy Grafana microservices dashboard JSON
+  ansible.builtin.copy:
+    src: microservices.json
+    dest: /opt/monitoring/grafana/provisioning/dashboards/microservices.json
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+  become: true
+
+# ── 5. Docker Compose for the monitoring stack
+- name: Template monitoring docker-compose.yml
+  ansible.builtin.template:
+    src: monitoring-compose.yml.j2
+    dest: /opt/monitoring/docker-compose.yml
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+  become: true
+
+- name: Pull monitoring images
+  community.docker.docker_compose_v2:
+    project_src: /opt/monitoring
+    pull: always
+  become: true
+
+- name: Start monitoring stack
+  community.docker.docker_compose_v2:
+    project_src: /opt/monitoring
+    state: present
+  become: true
+
+# ── 6. Wait for services to be up ─────────────
+- name: Wait for Prometheus to be reachable
+  ansible.builtin.uri:
+    url: "http://localhost:9090/-/ready"
+    method: GET
+    status_code: 200
+  register: prom_ready
+  until: prom_ready.status == 200
+  retries: 10
+  delay: 10
+
+- name: Wait for Grafana to be reachable
+  ansible.builtin.uri:
+    url: "http://localhost:3000/api/health"
+    method: GET
+    status_code: 200
+  register: grafana_ready
+  until: grafana_ready.status == 200
+  retries: 10
+  delay: 10
+
+- name: Wait for Alertmanager to be reachable
+  ansible.builtin.uri:
+    url: "http://localhost:9093/-/ready"
+    method: GET
+    status_code: 200
+  register: am_ready
+  until: am_ready.status == 200
+  retries: 10
+  delay: 10
+
+# ── 7. Verify Prometheus targets ──────────────
+- name: Query Prometheus active targets
+  ansible.builtin.uri:
+    url: "http://localhost:9090/api/v1/targets"
+    method: GET
+    return_content: true
+  register: prom_targets
+
+- name: Count active targets
+  ansible.builtin.set_fact:
+    active_target_count: >-
+      {{ (prom_targets.json.data.activeTargets | selectattr('health','equalto','up') | list | length) }}
+
+- name: Print Prometheus target health summary
+  ansible.builtin.debug:
+    msg: "Prometheus has {{ active_target_count }} target(s) in UP state"
+
+# ── Handlers ─────────────────────────────────
+handlers:
+  - name: Restart prometheus
+    community.docker.docker_compose_v2:
+      project_src: /opt/monitoring
+      services:
+        - prometheus
+      state: restarted
+    become: true
+
+  - name: Restart alertmanager
+    community.docker.docker_compose_v2:
+      project_src: /opt/monitoring
+      services:
+        - alertmanager
+      state: restarted
+    become: true

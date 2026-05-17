@@ -1,0 +1,223 @@
+---
+# ─────────────────────────────────────────────
+# roles/node_config/tasks/main.yml
+# Harden and configure every cluster node
+# ─────────────────────────────────────────────
+
+# ── 1. System update ─────────────────────────
+- name: Update and upgrade all packages
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: dist
+    autoremove: true
+    autoclean: true
+  become: true
+
+- name: Install common utility packages
+  ansible.builtin.apt:
+    name:
+      - curl
+      - wget
+      - git
+      - vim
+      - htop
+      - net-tools
+      - unzip
+      - jq
+      - python3-pip
+      - python3-venv
+      - nfs-common
+      - open-iscsi
+    state: present
+  become: true
+
+# ── 2. Timezone ───────────────────────────────
+- name: Set timezone to UTC
+  community.general.timezone:
+    name: UTC
+  become: true
+
+# ── 3. NTP / chrony ──────────────────────────
+- name: Install chrony for NTP sync
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+  become: true
+
+- name: Ensure chrony is running and enabled
+  ansible.builtin.systemd:
+    name: chrony
+    enabled: true
+    state: started
+  become: true
+
+# ── 4. Firewall (UFW) ─────────────────────────
+- name: Install UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+  become: true
+
+- name: Allow SSH
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+  become: true
+
+- name: Open Kubernetes control-plane ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "6443"   # API server
+    - "2379"   # etcd client
+    - "2380"   # etcd peer
+    - "10250"  # kubelet API
+    - "10251"  # kube-scheduler
+    - "10252"  # kube-controller-manager
+  when: inventory_hostname in groups['control_plane']
+  become: true
+
+- name: Open worker-node ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "10250"        # kubelet API
+    - "30000:32767"  # NodePort range
+  when: inventory_hostname in groups['worker_nodes']
+  become: true
+
+- name: Open microservice ports (direct access)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.value }}"
+    proto: tcp
+  loop: "{{ service_ports | dict2items }}"
+  become: true
+
+- name: Open monitoring ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "9090"   # Prometheus
+    - "3000"   # Grafana
+    - "9093"   # Alertmanager
+    - "9100"   # node-exporter
+  become: true
+
+- name: Enable UFW (default deny incoming)
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+  become: true
+
+# ── 5. SSH hardening ──────────────────────────
+- name: Harden SSH configuration
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+    backup: true
+  loop:
+    - { regexp: '^#?PermitRootLogin',     line: 'PermitRootLogin no' }
+    - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+    - { regexp: '^#?X11Forwarding',       line: 'X11Forwarding no' }
+    - { regexp: '^#?MaxAuthTries',        line: 'MaxAuthTries 3' }
+    - { regexp: '^#?ClientAliveInterval', line: 'ClientAliveInterval 300' }
+    - { regexp: '^#?ClientAliveCountMax', line: 'ClientAliveCountMax 2' }
+  become: true
+  notify: Restart sshd
+
+# ── 6. Sysctl tuning ──────────────────────────
+- name: Apply performance sysctl settings
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: true
+  loop:
+    - { key: "vm.swappiness",                        value: "10" }
+    - { key: "net.core.somaxconn",                   value: "65535" }
+    - { key: "net.ipv4.tcp_max_syn_backlog",          value: "65535" }
+    - { key: "net.ipv4.ip_local_port_range",          value: "1024 65535" }
+    - { key: "net.core.netdev_max_backlog",           value: "65536" }
+    - { key: "fs.file-max",                          value: "2097152" }
+    - { key: "fs.inotify.max_user_instances",        value: "8192" }
+    - { key: "fs.inotify.max_user_watches",          value: "524288" }
+  become: true
+
+# ── 7. Application directory ─────────────────
+- name: Create application directory
+  ansible.builtin.file:
+    path: "{{ app_repo_dir }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+  become: true
+
+# ── 8. Node Exporter (Prometheus agent) ───────
+- name: Download node_exporter
+  ansible.builtin.get_url:
+    url: >
+      https://github.com/prometheus/node_exporter/releases/download/v1.8.1/node_exporter-1.8.1.linux-amd64.tar.gz
+    dest: /tmp/node_exporter.tar.gz
+    mode: "0644"
+
+- name: Extract node_exporter
+  ansible.builtin.unarchive:
+    src: /tmp/node_exporter.tar.gz
+    dest: /tmp/
+    remote_src: true
+
+- name: Install node_exporter binary
+  ansible.builtin.copy:
+    src: /tmp/node_exporter-1.8.1.linux-amd64/node_exporter
+    dest: /usr/local/bin/node_exporter
+    mode: "0755"
+    remote_src: true
+  become: true
+
+- name: Create node_exporter systemd unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/node_exporter.service
+    content: |
+      [Unit]
+      Description=Prometheus Node Exporter
+      After=network.target
+
+      [Service]
+      User=nobody
+      ExecStart=/usr/local/bin/node_exporter \
+        --collector.systemd \
+        --collector.processes
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+    mode: "0644"
+  become: true
+
+- name: Enable and start node_exporter
+  ansible.builtin.systemd:
+    name: node_exporter
+    daemon_reload: true
+    enabled: true
+    state: started
+  become: true
+
+# ── Handlers ─────────────────────────────────
+handlers:
+  - name: Restart sshd
+    ansible.builtin.systemd:
+      name: sshd
+      state: restarted
+    become: true

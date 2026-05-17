@@ -1,0 +1,65 @@
+groups:
+  - name: microservices_alerts
+    rules:
+
+      # Order service DB connection errors
+      - alert: OrderServiceDBConnectionErrors
+        expr: increase(order_db_connection_errors_total[1m]) > 5
+        for: 30s
+        labels:
+          severity: critical
+          service: order-service
+        annotations:
+          summary: "Order Service DB connection errors detected"
+          description: "Order service has had {{ $value }} DB connection errors in the last minute. Possible database misconfiguration."
+
+      # High error rate on order service
+      - alert: OrderServiceHighErrorRate
+        expr: rate(order_requests_total{status="500"}[2m]) > 0
+        for: 30s
+        labels:
+          severity: critical
+          service: order-service
+        annotations:
+          summary: "Order Service returning 500 errors"
+          description: "Order service error rate is {{ $value }} req/sec"
+
+      # High error rate on any service
+      - alert: ServiceHighErrorRate
+        expr: rate(auth_requests_total{status="500"}[2m]) > 0.1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Auth service high error rate"
+          description: "Error rate: {{ $value }}"
+
+      # Order service down (no metrics)
+      - alert: OrderServiceDown
+        expr: up{job="order-service"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Order service is down"
+          description: "Order service has been down for more than 30 seconds"
+
+      # High request latency
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.99, rate(order_request_duration_seconds_bucket[5m])) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Order service P99 latency > 5s"
+          description: "P99 latency: {{ $value }}s"
+
+      # DB connection failures (order service)
+      - alert: OrderDBConnectionFailed
+        expr: order_failures_total > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Order service failures detected"
+          description: "{{ $value }} total order failures"
