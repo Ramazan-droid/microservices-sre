@@ -33,7 +33,7 @@ export default function Dashboard() {
     setServices(results);
 
     try {
-      const [p, o] = await Promise.all([
+      const [p,o,rv] = await Promise.all([
         fetch("/products-svc/products"),
         fetch("/orders-svc/orders"),
         fetch("/reviews-svc/reviews"),
@@ -41,7 +41,7 @@ export default function Dashboard() {
 
       const pd = await p.json();
       const od = await o.json();
-      const rd = await r.json();
+      const rd = await rv.json();
 
       setStats({
         products: pd.products?.length || 0,

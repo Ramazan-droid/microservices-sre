@@ -47,10 +47,10 @@ metadata:
   name: nginx
   namespace: microshop
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: nginx
   ports:
     - port: 80
       targetPort: 80
-      nodePort: 30080   # access via http://<server-ip>:30080
+      # nodePort: 30080   # access via http://<server-ip>:30080
