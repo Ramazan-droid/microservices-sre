@@ -1,6 +1,5 @@
-handlers:
-  - name: Restart sshd
-    ansible.builtin.systemd:
-      name: sshd
-      state: restarted
-    become: true
+- name: Restart sshd
+  ansible.builtin.systemd:
+    name: sshd
+    state: restarted
+  become: true
