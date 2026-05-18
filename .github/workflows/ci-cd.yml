@@ -72,6 +72,22 @@ jobs:
 
             sudo k3s kubectl apply -f k8s/
 
+      # - name: Testing
+      #   uses: appleboy/ssh-action@v1.0.3
+      #   with:
+      #     host: ${{ secrets.SERVER_HOST }}
+      #     username: ${{ secrets.SERVER_USER }}
+      #     key: ${{ secrets.SERVER_SSH_KEY }}
+      #     script: |
+      #       set -e
+
+      #       sudo k3s kubectl get nodes
+      #       sudo k3s kubectl get pods -A
+      #       sudo k3s kubectl get svc -A
+
+      #       curl -I http://localhost || true
+
+      #       echo "CI/CD finished successfully"
       - name: Testing
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -81,10 +97,22 @@ jobs:
           script: |
             set -e
 
+            echo "Checking Kubernetes cluster..."
             sudo k3s kubectl get nodes
+
+            echo "Checking pods..."
             sudo k3s kubectl get pods -A
+
+            echo "Checking services..."
             sudo k3s kubectl get svc -A
 
-            curl -I http://localhost || true
+            echo "Waiting for deployments..."
+            sleep 20
+
+            echo "Verifying pods are running..."
+            sudo k3s kubectl get pods -A | grep -v Running && exit 1 || true
+
+            echo "Testing frontend..."
+            curl -I http://localhost
 
             echo "CI/CD finished successfully"
