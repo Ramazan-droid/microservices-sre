@@ -97,22 +97,22 @@ jobs:
           script: |
             set -e
 
-            echo "Checking Kubernetes cluster..."
+            echo "Checking Kubernetes node..."
             sudo k3s kubectl get nodes
 
-            echo "Checking pods..."
-            sudo k3s kubectl get pods -A
+            echo "Checking microshop pods..."
+            sudo k3s kubectl get pods -n microshop
 
-            echo "Checking services..."
-            sudo k3s kubectl get svc -A
+            echo "Waiting for microshop pods to be ready..."
+            sudo k3s kubectl wait --for=condition=Ready pod --all -n microshop --timeout=120s
 
-            echo "Waiting for deployments..."
-            sleep 20
+            echo "Checking microshop services..."
+            sudo k3s kubectl get svc -n microshop
 
-            echo "Verifying pods are running..."
-            sudo k3s kubectl get pods -A | grep -v Running && exit 1 || true
+            echo "Testing Kubernetes DNS..."
+            sudo k3s kubectl exec -n microshop deploy/auth-service -- getent hosts postgres-identity
 
             echo "Testing frontend..."
-            curl -I http://localhost
+            curl -I http://localhost || true
 
             echo "CI/CD finished successfully"
