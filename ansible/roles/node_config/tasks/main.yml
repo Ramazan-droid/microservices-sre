@@ -159,8 +159,8 @@
   ansible.builtin.file:
     path: "{{ app_repo_dir }}"
     state: directory
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
+    owner: ubuntu
+    group: ubuntu
     mode: "0755"
   become: true
 

@@ -54,8 +54,7 @@ jobs:
           ansible-playbook \
             -i ansible/inventory/hosts.ini \
             ansible/site.yml \
-            --vault-password-file ~/.vault_pass \
-            -e "ansible_user=${{ secrets.SERVER_USER }}"
+            --vault-password-file ~/.vault_pass 
         env:
           ANSIBLE_HOST_KEY_CHECKING: "False"
 
