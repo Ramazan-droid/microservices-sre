@@ -1,8 +1,7 @@
 ---
 # ─────────────────────────────────────────────
 # roles/kubernetes/tasks/main.yml
-# Install Kubernetes (kubeadm + kubelet + kubectl)
-# and bootstrap the cluster
+# Install Kubernetes packages only
 # ─────────────────────────────────────────────
 
 # ── 1. Kernel prerequisites ──────────────────
@@ -36,7 +35,7 @@
     - { key: "net.ipv4.ip_forward",                 value: "1" }
   become: true
 
-# ── 2. Disable swap (Kubernetes requirement) ──
+# ── 2. Disable swap ──────────────────────────
 - name: Disable swap immediately
   ansible.builtin.command: swapoff -a
   changed_when: false
@@ -49,7 +48,7 @@
     replace: '# \1'
   become: true
 
-# ── 3. Install containerd (CRI) ───────────────
+# ── 3. Install containerd ─────────────────────
 - name: Install containerd
   ansible.builtin.apt:
     name: containerd.io
@@ -129,25 +128,7 @@
     state: started
   become: true
 
-# ── 5. Initialise control-plane (master only) ─
-- name: Check if cluster already initialised
-  ansible.builtin.stat:
-    path: /etc/kubernetes/admin.conf
-  register: kubeconfig_stat
-  when: inventory_hostname in groups['control_plane']
-
-- name: Initialise Kubernetes cluster (kubeadm init)
-  ansible.builtin.command: >
-    kubeadm init
-    --pod-network-cidr={{ pod_network_cidr }}
-    --apiserver-advertise-address={{ k8s_master_ip }}
-    --kubernetes-version=v{{ kubernetes_version }}.0
-  when:
-    - inventory_hostname in groups['control_plane']
-    - not kubeconfig_stat.stat.exists
-  become: true
-  register: kubeadm_init_output
-
+# ── 5. Kube config only ───────────────────────
 - name: Create .kube directory for ubuntu user
   ansible.builtin.file:
     path: /home/ubuntu/.kube
@@ -178,33 +159,6 @@
     KUBECONFIG: /home/ubuntu/.kube/config
   when: inventory_hostname in groups['control_plane']
   become: false
-
-# ── 7. Generate join command and join workers ─
-- name: Generate worker join command
-  ansible.builtin.command: kubeadm token create --print-join-command
-  register: join_command
-  when: inventory_hostname in groups['control_plane']
-  become: true
-  changed_when: false
-
-- name: Store join command as fact
-  ansible.builtin.set_fact:
-    k8s_join_command: "{{ join_command.stdout }}"
-  when: inventory_hostname in groups['control_plane']
-
-- name: Check if node has already joined the cluster
-  ansible.builtin.stat:
-    path: /etc/kubernetes/kubelet.conf
-  register: kubelet_conf_stat
-  when: inventory_hostname in groups['worker_nodes']
-
-- name: Join worker nodes to cluster
-  ansible.builtin.command: >
-    {{ hostvars[groups['control_plane'][0]]['k8s_join_command'] }}
-  when:
-    - inventory_hostname in groups['worker_nodes']
-    - not kubelet_conf_stat.stat.exists
-  become: true
 
 - name: Verify cluster nodes
   ansible.builtin.command: kubectl get nodes -o wide
