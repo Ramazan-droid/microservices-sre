@@ -1,0 +1,150 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/microshop
+
+jobs:
+
+  # ── 1. SSH → Server ───────────────────────────────────────────
+  ssh-server:
+    name: ssh->server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test SSH connection to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            echo "✅ SSH connection successful"
+            uname -a
+            uptime
+
+  # ── 2. Run Ansible ────────────────────────────────────────────
+  run-ansible:
+    name: run ansible
+    runs-on: ubuntu-latest
+    needs: ssh-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          pip install ansible ansible-lint
+
+      - name: Write SSH private key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Write Ansible Vault password
+        run: echo "${{ secrets.ANSIBLE_VAULT_PASS }}" > ~/.vault_pass
+
+      - name: Run Ansible playbook
+        run: |
+          ansible-playbook \
+            -i ansible/inventory/hosts.ini \
+            ansible/site.yml \
+            --vault-password-file ~/.vault_pass
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+
+  # ── 3. Build Images ───────────────────────────────────────────
+  build-images:
+    name: built images
+    runs-on: ubuntu-latest
+    needs: run-ansible
+    strategy:
+      matrix:
+        service: [auth, product, order, user, chat, review, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service == 'frontend' && 'frontend' || format('services/{0}', matrix.service) }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:latest
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}
+
+  # ── 4. Deploy Kubernetes ──────────────────────────────────────
+  deploy-kubernetes:
+    name: deploy kubernets
+    runs-on: ubuntu-latest
+    needs: build-images
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+
+      - name: Update image tags in manifests
+        run: |
+          for service in auth product order user chat review frontend; do
+            find k8s/ -name "*.yml" -exec \
+              sed -i "s|microshop/${service}:.*|microshop/${service}:${{ github.sha }}|g" {} \;
+          done
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/00-namespace.yml
+          kubectl apply -f k8s/01-configmap.yml
+          kubectl apply -f k8s/
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment -n microshop --timeout=120s
+
+  # ── 5. Testing ────────────────────────────────────────────────
+  testing:
+    name: testing
+    runs-on: ubuntu-latest
+    needs: deploy-kubernetes
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: pip install requests pytest
+
+      - name: Run load/integration tests
+        run: python load_test.py
+        env:
+          TARGET_URL: ${{ secrets.TARGET_URL }}
+
+      - name: Health check all services
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            kubectl get pods -n microshop
+            kubectl get services -n microshop
