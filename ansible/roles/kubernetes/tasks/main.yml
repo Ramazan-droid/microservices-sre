@@ -129,6 +129,13 @@
   become: true
 
 # ── 5. Kube config only ───────────────────────
+- name: Check if Kubernetes admin.conf exists
+  ansible.builtin.stat:
+    path: /etc/kubernetes/admin.conf
+  register: admin_conf_stat
+  when: inventory_hostname in groups['control_plane']
+  become: true
+
 - name: Create .kube directory for ubuntu user
   ansible.builtin.file:
     path: /home/ubuntu/.kube
@@ -136,7 +143,9 @@
     mode: "0755"
     owner: ubuntu
     group: ubuntu
-  when: inventory_hostname in groups['control_plane']
+  when:
+    - inventory_hostname in groups['control_plane']
+    - admin_conf_stat.stat.exists | default(false)
   become: true
 
 - name: Copy admin.conf to ubuntu user's kube config
@@ -147,9 +156,10 @@
     owner: ubuntu
     group: ubuntu
     mode: "0600"
-  when: inventory_hostname in groups['control_plane']
+  when:
+    - inventory_hostname in groups['control_plane']
+    - admin_conf_stat.stat.exists | default(false)
   become: true
-
 # ── 6. Install Flannel CNI ────────────────────
 - name: Apply Flannel CNI manifest
   ansible.builtin.command: >
