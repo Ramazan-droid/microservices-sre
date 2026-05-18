@@ -56,8 +56,8 @@
 - name: Install Docker Engine
   ansible.builtin.apt:
     name:
-      - "docker-ce={{ docker_version }}*"
-      - "docker-ce-cli={{ docker_version }}*"
+      - docker-ce
+      - docker-ce-cli
       - containerd.io
       - docker-buildx-plugin
       - docker-compose-plugin
