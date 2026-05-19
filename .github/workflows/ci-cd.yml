@@ -43,6 +43,12 @@ jobs:
           script: |
             set -e
 
+            echo "Installing Ansible if missing..."
+            if ! command -v ansible-playbook >/dev/null 2>&1; then
+              sudo apt update
+              sudo apt install -y ansible
+            fi
+
             echo "Entering Ansible folder..."
             cd ~/app/ansible
 
