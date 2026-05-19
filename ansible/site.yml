@@ -35,6 +35,8 @@
   hosts: control_plane
   become: false
   gather_facts: true
+  vars_files:
+    - group_vars/vault.yml
   roles:
     - role: app_deploy
   tags: [deploy, app]
