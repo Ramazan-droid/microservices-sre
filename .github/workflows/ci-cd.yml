@@ -46,8 +46,18 @@ jobs:
             echo "Installing Ansible if missing..."
             if ! command -v ansible-playbook >/dev/null 2>&1; then
               sudo apt update
-              sudo apt install -y ansible
+              sudo apt install -y ansible 
             fi
+
+            echo "Installing pip if missing..."
+            if ! command -v pip3 >/dev/null 2>&1; then
+              sudo apt update
+              sudo apt install -y python3-pip
+            fi
+
+            echo "Installing Kubernetes Python library if missing..."
+            python3 -c "import kubernetes" 2>/dev/null || \
+            python3 -m pip install --user kubernetes
 
             echo "Entering Ansible folder..."
             cd ~/app/ansible
