@@ -1,0 +1,142 @@
+version: "3.8"
+
+services:
+  postgres-identity:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: identity_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_identity_data:/var/lib/postgresql/data
+    networks:
+      - microservices-net
+    deploy:
+      replicas: 1
+
+  postgres-business:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: business_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_business_data:/var/lib/postgresql/data
+    networks:
+      - microservices-net
+    deploy:
+      replicas: 1
+
+  auth-service:
+    image: ghcr.io/YOUR_USERNAME/microshop-auth:latest
+    environment:
+      DATABASE_URL: postgresql://admin:password@postgres-identity:5432/identity_db
+      SECRET_KEY: supersecretjwtkey12345
+    networks:
+      - microservices-net
+    deploy:
+      replicas: 2
+
+  user-service:
+    image: ghcr.io/YOUR_USERNAME/microshop-user:latest
+    environment:
+      DATABASE_URL: postgresql://admin:password@postgres-identity:5432/identity_db
+    networks:
+      - microservices-net
+    deploy:
+      replicas: 2
+
+  product-service:
+    image: ghcr.io/YOUR_USERNAME/microshop-product:latest
+    environment:
+      DATABASE_URL: postgresql://admin:password@postgres-business:5432/business_db
+    networks:
+      - microservices-net
+    deploy:
+      replicas: 2
+
+  order-service:
+    image: ghcr.io/YOUR_USERNAME/microshop-order:latest
+    environment:
+      DATABASE_URL: postgresql://admin:password@postgres-business:5432/business_db
+      PRODUCT_SERVICE_URL: http://product-service:8002
+    networks:
+      - microservices-net
+    deploy:
+      replicas: 2
+
+  chat-service:
+    image: ghcr.io/YOUR_USERNAME/microshop-chat:latest
+    environment:
+      DATABASE_URL: postgresql://admin:password@postgres-business:5432/business_db
+    networks:
+      - microservices-net
+    deploy:
+      replicas: 2
+
+  review-service:
+    image: ghcr.io/YOUR_USERNAME/microshop-review:latest
+    environment:
+      DATABASE_URL: postgresql://admin:password@postgres-business:5432/business_db
+    networks:
+      - microservices-net
+    deploy:
+      replicas: 2
+
+  nginx:
+    image: ghcr.io/YOUR_USERNAME/microshop-frontend:latest
+    ports:
+      - "80:80"
+    networks:
+      - microservices-net
+    deploy:
+      replicas: 1
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - microservices-net
+    deploy:
+      replicas: 1
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - microservices-net
+    deploy:
+      replicas: 1
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks:
+      - microservices-net
+    deploy:
+      replicas: 1
+
+volumes:
+  postgres_identity_data:
+  postgres_business_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  microservices-net:
+    driver: overlay
