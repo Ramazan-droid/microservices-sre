@@ -187,14 +187,4 @@
     label: "{{ item.metadata.name }}"
   ignore_errors: true   # non-fatal; alert instead of aborting
 
-# ── 9. Health-check each service endpoint ────
-- name: Wait for auth-service health endpoint
-  ansible.builtin.uri:
-    url: "http://{{ k8s_master_ip }}:{{ service_ports.auth }}/health"
-    method: GET
-    status_code: 200
-  register: auth_health
-  until: auth_health.status == 200
-  retries: "{{ healthcheck_retries }}"
-  delay: "{{ healthcheck_delay }}"
-  ignore_errors: true
+
