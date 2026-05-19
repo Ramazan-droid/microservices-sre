@@ -41,11 +41,3 @@
     - role: app_deploy
   tags: [deploy, app]
 
-- name: "05 – Deploy monitoring stack"
-  hosts: monitoring_nodes
-  become: true
-  gather_facts: true
-  roles:
-    - role: docker       # monitoring host also needs docker
-    - role: monitoring
-  tags: [monitoring, observability]
